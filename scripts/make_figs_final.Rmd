@@ -1392,7 +1392,7 @@ to_plot <- Ach_CL_data %>% left_join(
 g1 <- ggplot(to_plot, aes(CN, D1, fill = `Screen signal`)) + 
     geom_point(shape = 21, color = 'black', size = 2, stroke = 0.25, alpha = 0.8) + 
     # geom_smooth(method = 'lm', color = 'black') +
-    scale_fill_gradient2(midpoint = 1, limits = c(0.5, 2), oob = squish, breaks = c(0.5, 2)) +
+    scale_fill_gradient2(midpoint = 1, limits = c(0.5, 1.5), oob = squish, breaks = c(0.5, 1.5)) +
     # guides(color = guide_legend(title = 'Screen signal')) +
     xlab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' relative CN (log2)')) +
     ylab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' dependency (D1)'))+
@@ -1410,7 +1410,7 @@ g2 <- ggplot(to_plot, aes(CN, D2, fill = `Screen signal`)) +
     geom_point(shape = 21, color = 'black', size = 2, stroke = 0.25, alpha = 0.8) + 
     # geom_smooth(method = 'lm', color = 'black') +
     # guides(color = guide_legend(title = 'Screen signal')) +
-   scale_fill_gradient2(midpoint = 1, limits = c(0.5, 2), oob = squish) +
+   scale_fill_gradient2(midpoint = 1, limits = c(0.5, 1.5), oob = squish) +
     xlab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' relative CN (log2)')) +
     ylab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' dependency (D2)')) +
     theme_Publication(base_font) 
@@ -1640,6 +1640,8 @@ ggplot(unc_df, aes(ssmd, avg_sd)) +
     xlab('Cell line screen quality\n(GA model SSMD)') +
     theme_Publication(base_font)
 
+with(avg_unc, cor.test(avg_sd, gene_slope, method = 'spearman'))
+
 ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
 ```
 
@@ -1649,6 +1651,8 @@ ggplot(unc_df, aes(rep_cor, avg_sd)) +
     ylab('Average dependency score\nuncertainty (SD)') +
     xlab('Avg. replicate correlation') +
     theme_Publication(base_font)
+
+with(unc_df, cor.test(avg_sd, rep_cor, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'repcor_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
 
@@ -1701,6 +1705,14 @@ CRISPR_cors_with_unc %<>% left_join(gene_avgs %>%
                                filter(dset == 'D2_DRIVE') %>% 
                                dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
                            by = "Gene")
+
+CRISPR_cors_unc_spread <- CRISPR_cors_with_unc %>% 
+    dplyr::select(Gene, cor, dset) %>% 
+  spread(dset, cor)
+with(CRISPR_cors_unc_spread, wilcox.test(D2noUnc_Ach, D2_Ach, paired = TRUE))
+with(CRISPR_cors_unc_spread, sum(!is.na(D2noUnc_Ach) & !is.na(D2_Ach)))
+with(CRISPR_cors_unc_spread, wilcox.test(D2noUnc_DRIVE, D2_DRIVE, paired = TRUE))
+with(CRISPR_cors_unc_spread, sum(!is.na(D2noUnc_DRIVE) & !is.na(D2_DRIVE)))
 
 p1 <- ggplot(CRISPR_cors_with_unc %>% filter(grepl('Ach', dset)) %>% 
             mutate(model = str_match(dset, '([:alnum:]+)_')[,2]) %>% 
@@ -2123,6 +2135,13 @@ ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_c
     theme_Publication(base_font) +
     theme(legend.text = element_text(size = rel(0.7)))
 
+CRISPR_cors_spread <- CRISPR_cors %>% 
+  dplyr::select(Gene, cor, dset) %>% 
+  spread(dset, cor)
+
+with(CRISPR_cors_spread, wilcox.test(D2_comb, D2_Ach, paired = TRUE))
+with(CRISPR_cors_spread, wilcox.test(D2_comb, D2_DRIVE, paired = TRUE))
+
 ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 4, height = 3.5, dpi = 350)
 
 ```
@@ -2140,6 +2159,8 @@ bench_cors_overlap <- bench_res_overlap %>%
     dplyr::select(-p.value) %>% 
     spread(model, cor)
 
+with(bench_cors_overlap, wilcox.test(abs(D2_comb), abs(D2_Ach), paired = TRUE))
+with(bench_cors_overlap, wilcox.test(abs(D2_comb), abs(D2_DRIVE), paired = TRUE))
 ```
 
 ## 5e: Combined D2 improves benchmark-dependency relationships
@@ -2571,6 +2592,9 @@ ggplot(df, aes(ssmd)) +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication()
 
+with(df %>% filter(dset == 'GA_Ach'), cor.test(ssmd, Ach_gene_slope, method = 'spearman'))
+with(df %>% filter(dset == 'GA_DRIVE'), cor.test(ssmd, DRIVE_gene_slope, method = 'spearman'))
+
 ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
 
 ```
@@ -2614,6 +2638,8 @@ ggplot(CL_data, aes(gene_slope_Ach, gene_slope_DRIVE)) +
     xlab('Screen signal (Achilles)') +
     ylab('Screen signal (DRIVE)') +
     theme_Publication(base_font)
+
+with(CL_data, cor.test(gene_slope_Ach, gene_slope_DRIVE, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'RNAi_eff_compare.png'), width = 4, height = 3.5, dpi = 350)
 
@@ -2764,6 +2790,12 @@ ggplot(bench_res_test,
     # scale_colour_Publication() +
     theme_Publication() 
 
+bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(-p.value, -norm_type, -dataset) %>% mutate(cor = abs(cor)), model, cor)
+with(bench_res_test_spread, wilcox.test(Global_norm_Achilles, CL_norm_Achilles, paired = TRUE))
+with(bench_res_test_spread, sum(!is.na(Global_norm_Achilles) & !is.na(CL_norm_Achilles)))
+with(bench_res_test_spread, wilcox.test(Global_norm_DRIVE, CL_norm_DRIVE, paired = TRUE))
+with(bench_res_test_spread, sum(!is.na(Global_norm_DRIVE) & !is.na(CL_norm_DRIVE)))
+
 ggsave(file.path(fig_dir, 'GAnorm_benchmark_ecdf.png'), width = 5, height = 4.5, dpi = 350)
 
 ```
@@ -2848,6 +2880,9 @@ p2 <- ggplot(df, aes(gene_slope, Doubling_time)) +
     theme_Publication() +
     facet_wrap(~dset)
 
+with(df, cor.test(ov_slope, Doubling_time, method = 'spearman'))
+with(df, cor.test(gene_slope, Doubling_time, method = 'spearman'))
+
 cowplot::plot_grid(p1, p2, nrow=2)
 ggsave(file.path(fig_dir, 'doubling_time_scatter.png'), width = 7, height = 7, dpi = 350)
 
@@ -2906,10 +2941,6 @@ all_df <- rbind(
     Ach_df %>% mutate(dset = 'Achilles'),
     DRIVE_df %>% mutate(dset = 'DRIVE')
 ) %>% mutate(b_type = ifelse(barcode %in% CE_bc, 'ess', 'non_ess'))
-all_df <- rbind(
-    Ach_df %>% mutate(dset = 'Achilles'),
-    DRIVE_df %>% mutate(dset = 'DRIVE')
-) %>% mutate(b_type = ifelse(barcode %in% CE_bc, 'ess', 'non_ess'))
 cl_avgs <- all_df %>% 
     ddply(.(dset, CCLE_ID), function(df) {
         data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
@@ -2924,6 +2955,83 @@ ggplot(hp_ssmds, aes(Achilles, DRIVE)) +
     ggtitle('shRNA')
 ggsave(file.path(fig_dir, 'LFC_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
 
+#compare SSMD using hps common to DRIVE and Achilles
+DRIVE_Ach_common_hps <- intersect(unique(Ach_df$barcode), unique(DRIVE_df$barcode))
+common_pos_con_hps <- length(intersect(DRIVE_Ach_common_hps, CE_bc))
+common_neg_con_hps <- length(intersect(DRIVE_Ach_common_hps, NE_bc))
+sprintf('%d common pos hps, %d common neg hps', common_pos_con_hps, common_neg_con_hps)
+
+cl_avgs_common <- all_df %>% 
+  filter(barcode %in% DRIVE_Ach_common_hps) %>% 
+    ddply(.(dset, CCLE_ID), function(df) {
+        data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
+    })
+hp_ssmds_common <- spread(cl_avgs_common, dset, SSMD)
+ggplot(hp_ssmds_common, aes(Achilles, DRIVE)) + 
+    geom_point(alpha = 0.75) + 
+    geom_abline() +
+    xlab('Achilles pos/neg separation (SSMD)') +
+    ylab('DRIVE pos/neg separation (SSMD)') +
+    theme_Publication() + 
+    ggtitle('shRNA')
+ggsave(file.path(fig_dir, 'LFC_SSMD_compare_common_shRNAs.png'), width = 4.5, height = 4, dpi = 350)
+
+#compare SSMD using hps common to DRIVE and Achilles or DRIVE-only hps
+DRIVE_only_hps <- setdiff(unique(DRIVE_df$barcode), unique(Ach_df$barcode))
+cl_avgs_Donly <- all_df %>% 
+  filter(barcode %in% DRIVE_only_hps) %>% 
+    ddply(.(dset, CCLE_ID), function(df) {
+        data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
+    })
+
+#compare SSMD using hps common to DRIVE and Achilles or Achilles-only hps
+Ach_only_hps <- setdiff(unique(Ach_df$barcode), unique(DRIVE_df$barcode))
+cl_avgs_Aonly <- all_df %>% 
+  filter(barcode %in% Ach_only_hps) %>% 
+    ddply(.(dset, CCLE_ID), function(df) {
+        data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
+    })
+
+# cl_avgs_unique <- full_join(cl_avgs_Aonly, cl_avgs_Donly, by = 'CCLE_ID', suffix = c('_Aonly', '_Donly'))
+# ggplot(cl_avgs_unique, aes(SSMD_Aonly, SSMD_Donly)) + 
+#     geom_point(alpha = 0.75) + 
+#     geom_abline() +
+#     xlab('Pos/neg separation SSMD\n(Ach-only shRNAs)') +
+#     ylab('Pos/neg separation SSMD\n(DRIVE-only shRNAs)') +
+#     theme_Publication() + 
+#     ggtitle('shRNA')
+# ggsave(file.path(fig_dir, 'LFC_SSMD_compare_unique_shRNAs.png'), width = 4.5, height = 4, dpi = 350)
+
+#compare Achilles-vs-DRIVE LFC SSMD for common vs unique shRNA sets
+hp_ssmd_t <- hp_ssmds_common %>% 
+  dplyr::rename(Achilles_common = Achilles, DRIVE_common = DRIVE) %>% 
+  full_join(cl_avgs_unique %>% dplyr::select(CCLE_ID, Achilles_unique = SSMD_Aonly, DRIVE_unique = SSMD_Donly), by = 'CCLE_ID') %>% 
+  mutate(common_diff = Achilles_common - DRIVE_common,
+         unique_diff = Achilles_unique - DRIVE_unique) %>% 
+  dplyr::select(CCLE_ID, common_diff, unique_diff) %>% 
+  reshape2::melt(id.vars = 'CCLE_ID', variable.name = 'type', value.name = 'SSMD_diff') %>% 
+  mutate(type = revalue(type, replace = c(common_diff = 'Common shRNAs', unique_diff = 'Unique shRNAs')))
+ggplot(hp_ssmd_t, aes(SSMD_diff, group = type, color = type)) + 
+  stat_bin(fill = 'white', alpha = 0.5, bins = 25, position = 'dodge') + 
+  geom_vline(xintercept = 0, linetype = 'dashed') +
+  xlim(-0.5, 0.5) +
+  guides(color = guide_legend(title = element_blank())) +
+  xlab('SSMD difference (Achilles - DRIVE)') +
+  ylab('Num cell lines') +
+  theme_Publication()
+ggsave(file.path(fig_dir, 'LFC_SSMD_diff_hist.png'), width = 4.5, height = 4, dpi = 350)
+
+hp_ssmd_spread <- spread(hp_ssmd_t, type, SSMD_diff)
+with(hp_ssmd_spread, wilcox.test(`Common shRNAs`))
+with(hp_ssmd_spread, median(`Common shRNAs`, na.rm=T))
+with(hp_ssmd_spread, wilcox.test(`Unique shRNAs`))
+with(hp_ssmd_spread, median(`Unique shRNAs`, na.rm=T))
+with(hp_ssmd_spread, sum(!is.na(`Unique shRNAs`) & !is.na(`Common shRNAs`)))
+
+
+with(hp_ssmds, wilcox.test(Achilles, DRIVE, paired = TRUE))
+with(hp_ssmds, median((Achilles - DRIVE)/DRIVE, na.rm=T))
+with(hp_ssmds, sum(!is.na(Achilles) & !is.na(DRIVE)))
 
 only_overlapping_genes <- TRUE
 neg_control_type <- 'non_essential'
@@ -2940,26 +3048,36 @@ ggplot(temp_per_CL_stats, aes(GA_Ach, GA_DRIVE)) +
     theme_Publication() +
     ggtitle('Gene')
 ggsave(file.path(fig_dir, 'GA_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
-with(temp_per_CL_stats, wilcox.test(GA_Ach, GA_DRIVE))
 
-binwidth <- 0.1
-comb_hp_data <- Ach_hp_data %>% mutate(dset = 'Achilles') %>% 
-    rbind(DR_hp_data %>% mutate(dset = 'DRIVE'))
-avg_Ach <- mean(Ach_hp_data$Geff, na.rm=T)
-avg_DR <- mean(DR_hp_data$Geff, na.rm=T)
-ggplot(comb_hp_data, aes(Geff)) + 
-    geom_histogram(data = filter(comb_hp_data, dset == 'Achilles'), 
-                     aes(y = 0.1*..density.., fill = 'Achilles', color = 'Achilles'), binwidth = 0.1, alpha = 0.35) +
-    geom_histogram(data = filter(comb_hp_data, dset == 'DRIVE'), 
-                     aes(y = 0.1*..density..,fill = 'DRIVE', color = 'DRIVE'), binwidth = 0.1, alpha = 0.35) +
-    guides(color = FALSE, fill = guide_legend(title = element_blank())) +
-    geom_vline(xintercept = avg_Ach, color = 'blue', linetype = 'dashed', lwd = 1.) +
-    geom_vline(xintercept = avg_DR, color = 'orange', linetype = 'dashed', lwd = 1.) +
-    ylab('Relative frequency') +
-    xlab('Estimated shRNA gene KD efficacy') +
-    scale_fill_Publication() +scale_colour_Publication() +
-    theme_Publication()
-ggsave(file.path(fig_dir, 'DR_Ach_hpeff_compare.png'), width = 4.5, height = 4, dpi = 350)
+with(temp_per_CL_stats, wilcox.test(GA_Ach, GA_DRIVE, paired = TRUE))
+with(temp_per_CL_stats, sum(!is.na(GA_Ach) & !is.na(GA_DRIVE)))
+with(temp_per_CL_stats, median((GA_Ach - GA_DRIVE)/GA_DRIVE, na.rm=T))
+
+# binwidth <- 0.1
+# comb_hp_data <- Ach_hp_data %>% mutate(dset = 'Achilles') %>% 
+#     rbind(DR_hp_data %>% mutate(dset = 'DRIVE'))
+# avg_Ach <- mean(Ach_hp_data$Geff, na.rm=T)
+# avg_DR <- mean(DR_hp_data$Geff, na.rm=T)
+# ggplot(comb_hp_data, aes(Geff)) + 
+#     geom_histogram(data = filter(comb_hp_data, dset == 'Achilles'), 
+#                      aes(y = 0.1*..density.., fill = 'Achilles', color = 'Achilles'), binwidth = 0.1, alpha = 0.35) +
+#     geom_histogram(data = filter(comb_hp_data, dset == 'DRIVE'), 
+#                      aes(y = 0.1*..density..,fill = 'DRIVE', color = 'DRIVE'), binwidth = 0.1, alpha = 0.35) +
+#     guides(color = FALSE, fill = guide_legend(title = element_blank())) +
+#     geom_vline(xintercept = avg_Ach, color = 'blue', linetype = 'dashed', lwd = 1.) +
+#     geom_vline(xintercept = avg_DR, color = 'orange', linetype = 'dashed', lwd = 1.) +
+#     ylab('Relative frequency') +
+#     xlab('Estimated shRNA gene KD efficacy') +
+#     scale_fill_Publication() +scale_colour_Publication() +
+#     theme_Publication()
+# ggsave(file.path(fig_dir, 'DR_Ach_hpeff_compare.png'), width = 4.5, height = 4, dpi = 350)
+# 
+# hp_Geff_paired <- comb_hp_data %>% 
+#   dplyr::select(hp, Geff, dset) %>% 
+#   spread(dset, Geff) %>% 
+#   filter(!is.na(Achilles), !is.na(DRIVE))
+# ggplot(hp_Geff_paired, aes(Achilles, DRIVE)) + 
+#   geom_point(alpha = 0.25) + geom_abline()
 
 ```
 
@@ -3046,5 +3164,10 @@ ggplot(bench_cors) +
     theme_Publication()
 ggsave(file.path(fig_dir, 'Ach_DRIVE_bench_compare.png'), width = 4, height = 4, dpi = 350)
 
+
+with(bench_cors, wilcox.test(abs(D2_Ach), abs(D2_DRIVE), paired=T))
+with(bench_cors, wilcox.test(abs(GA_Ach), abs(GA_DRIVE), paired=T))
+with(bench_cors, median((abs(GA_DRIVE) - abs(GA_Ach))/abs(GA_Ach), na.rm=T))
+with(bench_cors, sum(!is.na(GA_DRIVE) & !is.na(GA_Ach)))
 ```
 
