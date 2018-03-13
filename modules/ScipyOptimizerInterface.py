@@ -13,6 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 
+#*----------------------------------
+#Very slight modifications by JMM to return more info from Scipy Optimizer (convergence message, niters, fevals)
+#*----------------------------------
+
+
 """TensorFlow interface for third-party optimizers."""
 
 from __future__ import absolute_import
@@ -302,6 +307,8 @@ class ScipyOptimizerInterface(ExternalOptimizerInterface):
 
     import scipy.optimize  # pylint: disable=g-import-not-at-top
     result = scipy.optimize.minimize(*minimize_args, **minimize_kwargs)
+    
+    #************* Modified by JMM to return the message from the optimizer, as well as the number of iterations and function evals
     # logging.info('Optimization terminated with:\n'
     #              '  Message: %s\n'
     #              '  Objective function value: %f\n'
@@ -310,7 +317,7 @@ class ScipyOptimizerInterface(ExternalOptimizerInterface):
     #              result.message, result.fun, result.nit, result.nfev)
 
     return result['x'], result.message, result.nit, result.nfev
-
+    #************* 
 
 def _accumulate(list_):
   total = 0
