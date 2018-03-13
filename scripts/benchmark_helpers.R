@@ -947,13 +947,30 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
                 if (var(feature[cur_CLs], na.rm=T) == 0) {
                     res <- data.frame(cor = NA, p.value = NA)
                 } else {
-                    c <- wtd.cor(dep[cur_CLs], feature[cur_CLs],
-                                 weight = 1/dep_SD[cur_CLs]^2)
-                    res <- data.frame(cor = c[1, 'correlation'], p.value = c[1, 'p.value'])
+                  c <- wtd.cor(dep[cur_CLs], feature[cur_CLs],
+                               weight = 1/dep_SD[cur_CLs]^2)
+                  pvalue <- c[1, 'p.value']
+                  ptype <- 'cor'
+                  if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
+                    inG <- cur_CLs[feature[cur_CLs] == 1]
+                    outG <- cur_CLs[feature[cur_CLs] == 0]
+                    tres <- wtd.t.test(dep[inG], dep[outG], 
+                                    weight = 1/dep_SD[inG]^2, weighty = 1/dep_SD[outG]^2)
+                    pvalue <- tres$coefficients[['p.value']]
+                    ptype <- 'ttest'
+                  }
+                  res <- data.frame(cor = c[1, 'correlation'], p.value = pvalue, ptype = ptype)
                 }
             } else {
                 c <- cor.test(dep[cur_CLs], feature[cur_CLs], use = 'pairwise.complete.obs')
-                res <- data.frame(cor = c$estimate, p.value = c$p.value)
+                pvalue <- c$p.value
+                ptype <- 'cor'
+                if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
+                  tres <- t.test(dep[inG], dep[outG])
+                  pvalue <- tres$p.value
+                  ptype <- 'ttest'
+                }
+                res <- data.frame(cor = c$estimate, p.value = pvalue, ptype = ptype)
             }
             return(res)
         }, .id = 'model')

@@ -24,7 +24,7 @@ feature_datasets <- list(
     GE = list(data.name = 'ccle-rnaseq-logrpkm-protein-coding-2700',
               data.version = 2, transpose = T),
     CN = list(data.name = 'depmap-wes-cn-data-97cc', 
-              data.version = 3, 
+              data.version = 5, 
               data.file = 'public_18q1_gene_cn'),
     MUT = list(data.name = 'ccle-mutation-data-full-', data.version = 2)
 )

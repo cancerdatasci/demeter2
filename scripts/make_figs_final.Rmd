@@ -115,7 +115,7 @@ feature_datasets <- list(
               taiga_version = 1, 
               transpose = T),
     CN = list(taiga_name = 'depmap-wes-cn-data-97cc', 
-              taiga_version = 3, 
+              taiga_version = 5, 
               data.file = 'public_18q1_gene_cn'),
     MUT = list(taiga_name = 'ccle-mutation-data-full-', taiga_version = 2)
 )
@@ -1317,7 +1317,7 @@ CN_cors %<>% left_join(gene_avgs %>%
                                filter(dset == 'D2_Ach') %>% 
                                dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
                            by = "Gene") %>% 
-    left_join(gene_avgs %>% 
+             left_join(gene_avgs %>% 
                                filter(dset == 'D2_DRIVE') %>% 
                                dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
                            by = "Gene")
@@ -1336,7 +1336,7 @@ p1 <- ggplot(CN_cors %>% filter(grepl('Ach', dset)) %>%
     ylab('Avg dep-CN\ncorrelation magnitude') +
     xlab('Cell line avg. dependency score') +
     # ggtitle('Achilles') +
-    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.45)) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.475)) +
     guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
     # ggtitle('Achilles') +
     scale_color_manual(values = mod_type_pal) +
@@ -1352,7 +1352,7 @@ p2 <- ggplot(CN_cors %>% filter(grepl('DRIVE', dset)) %>%
     ylab('Avg. dep-CN\ncorrelation magnitude') +
     xlab('Cell line avg. dependency score') +
     # ggtitle('DRIVE') +
-    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.45)) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.475)) +
     guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
     # ggtitle('DRIVE') +
     scale_color_manual(values = mod_type_pal) +
@@ -1534,7 +1534,7 @@ p1 <- ggplot(df %>% filter(grepl('Ach', variable)) %>%
     ylab('CDF') +
     # ggtitle('Achilles') +
     xlim(0.6, 0) +
-    ylim(0, 0.5) +
+    ylim(0, 0.75) +
     guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
     scale_color_manual(values = mod_type_pal) +
     geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') + 
@@ -1551,7 +1551,7 @@ p2 <- ggplot(df %>% filter(grepl('DRIVE', variable)) %>%
     ylab('CDF') +
     # ggtitle('DRIVE') +
     xlim(0.6, 0) +
-    ylim(0, 0.5) +
+    ylim(0, 0.75) +
     guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
     geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') + 
     scale_color_manual(values = mod_type_pal) +
@@ -2157,8 +2157,8 @@ ggplot(df %>% filter(variable %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')
     guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
     xlab('Feature-dep. corr. magnitude') +
     ylab('CDF') + 
-    xlim(0.6, 0) +
-    ylim(0, 0.5) +
+    xlim(0.6, 0.2) +
+    ylim(0, 1) +
     geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') +
     # scale_colour_Publication() +
     scale_color_manual(values = data_type_pal) +
@@ -2214,7 +2214,7 @@ ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>
     stat_ecdf(size = 0.6) +
     scale_x_reverse() +
     xlim(60,0) +
-    ylim(0, 0.5) +
+    ylim(0, 1.0) +
     guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
     xlab('Feature-dep corr -log10(p-value)') +
     ylab('CDF') + 
@@ -2237,6 +2237,14 @@ ggplot(cur_bench_p, aes(-log10(D2_comb), -log10(D2_DRIVE))) +
     ylab('-log10(p-value) D2-DRIVE') +
     xlab('-log10(p-value) D2-comb') 
 ggsave(file.path(fig_dir, 'combined_scatter_p.png'), width = 4.5, height = 4, dpi = 350)
+
+with(bench_p, wilcox.test(-log10(D2_comb), -log10(D2_Ach), paired = TRUE))
+with(bench_p, wilcox.test(-log10(D2_comb), -log10(D2_DRIVE), paired = TRUE))
+
+temp <- bench_p %>% 
+  mutate(D2_comb = -log10(D2_comb), D2_Ach = -log10(D2_Ach), D2_DRIVE = -log10(D2_DRIVE)) %>% 
+  mutate(D2_imp_Ach = (D2_comb - D2_Ach),
+         D2_imp_DRIVE = (D2_comb - D2_DRIVE))
 
 ```
 
@@ -2749,7 +2757,7 @@ ggplot(bench_res_test,
     xlab('Correlation magnitude |r|') +
     ylab('CDF') +
     xlim(0.6, 0) +
-    ylim(0, 0.5) +
+    ylim(0, 1) +
     guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3)), 
            linetype = guide_legend(title = element_blank(), nrow=2, keyheight = 1.15)) +
     scale_color_manual(values = data_type_pal) +
