@@ -1,0 +1,3042 @@
+---
+title: "DEMETER2 Figures"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 6)
+library(plyr); library(magrittr);  
+library(reshape2)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(taigr);
+library(jsonlite)
+library(ggplot2)
+library(ggrepel)
+library(dependr)
+library(readr)
+library(stringr)
+library(cowplot)
+library(weights)
+library(scales)
+library(psych)
+library(knitr)
+library(cdsr)
+library(PRROC)
+library(GGally)
+library(limma)
+library(RColorBrewer)
+library(gridExtra)
+library(doMC)
+library(igraph)
+
+registerDoMC(cores = 3)
+
+source('~/CPDS/demeter2/scripts/benchmark_helpers.R')
+
+fig_dir <- '~/CPDS/demeter2/results/figures'
+base_font <- 12 #font size for figs
+
+###PARAMETERS
+GE_thresh <- -1 #threshold for defining unexpressed genes
+use_bayes <- TRUE #use posterior SDs
+min_avg_Geff <- 0.2 #minimum average Geff across hairpins to include a gene
+min_sum_Geff <- 1.5 #minimum sum Geff across hairpins to include a gene
+min_hps_per_gene <- 3 #minimum hairpins per gene for inclusion
+
+n_bench_biomarkers_per_type <- 200 #number of top dep-feature correlations per feature type to retain
+bench_cor_thresh <- 0.4 #threshold for CRISPR-feature-dep benchmark correlations
+
+normalization <- 'pos_neg' #type of normalization [pos_neg, global_z] (absolute GS only)
+include_gene_families <- FALSE #whether to include gene-families in analysis
+
+recompute_biomarker <- TRUE
+biomarker_res_cache_GE <- '~/CPDS/demeter2/results/compare_biomarker_cache_GE.rds'
+biomarker_res_cache_CN <- '~/CPDS/demeter2/results/compare_biomarker_cache_CN.rds'
+biomarker_res_cache_DAM_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_DAM_MUT.rds' 
+biomarker_res_cache_HOT_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_HOT_MUT.rds' 
+
+###DATASETS USED
+base_data_dir <- '~/CPDS/demeter2/'
+dep_datasets <- list(
+    D2_DRIVE = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/DRIVE_final/1'), dataset = 'DRIVE', type = 'abs'),
+    D2_Ach = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Ach_final/1'), dataset = 'Ach', type = 'abs'),
+    D2_Marc = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Marc_final/1'), dataset = 'Marcotte', type = 'abs'),
+    D2_comb = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/comb_final/1'), dataset = 'DRIVE', type = 'abs'),
+    D1_Marc = list(mod_type = 'D1', dataset = 'Marcotte', type = 'rel',
+                   taiga_name = 'marcotte-demeter-z-scored-expanded-gene-sols-e905',
+                   taiga_version = 10,
+                   taiga_file = 'ExpandedGeneZSolsCleaned'),
+    D1_Ach = list(mod_type = 'D1', dataset = 'Ach', type = 'rel',
+                   taiga_name = 'achilles-demeter-1-scores-3de4',
+                   taiga_version = 2),
+    D1_DRIVE = list(mod_type = 'D1', dataset = 'DRIVE', type = 'rel',
+                   taiga_name = 'drive-demeter-1-scores-e811',
+                   taiga_version = 4),
+    ATARiS_Ach = list(mod_type = 'ATARiS', dataset = 'Ach', type = 'rel',
+                      taiga_name = 'achilles-ataris-scores-12c6', 
+                      taiga_version = 4),
+    ATARiS_DRIVE = list(mod_type = 'ATARiS', dataset = 'DRIVE', type = 'rel',
+                      taiga_name = 'drive-ataris-scores-1988', 
+                      taiga_version = 5),
+    GA_Ach = list(mod_type = 'GA', dataset = 'Ach', type = 'abs',
+                   taiga_name = 'achilles-gene-averaging-matrices-608b',
+                   taiga_version = 9),
+    GA_DRIVE = list(mod_type = 'GA', dataset = 'DRIVE', type = 'abs',
+                   taiga_name = 'drive-gene-averaging-matrices-d967',
+                   taiga_version = 11),
+    GA_Marc = list(mod_type = 'GA', dataset = 'Marcotte', type = 'abs',
+                   taiga_name = 'marcotte-gene-averaging-matrix-6bcb',
+                   taiga_version = 3),
+    GA_comb = list(mod_type = 'GA', dataset = 'comb', type = 'abs',
+               taiga_name = 'gene-average-9c95',
+               taiga_version = 7),
+    RSA_Ach = list(mod_type = 'RSA', dataset = 'Ach', type = 'abs',
+                   taiga_name = 'achilles-rsa-scores-855d',
+                   taiga_version = 4),
+    RSA_DRIVE = list(mod_type = 'RSA', dataset = 'DRIVE', type = 'abs',
+                   taiga_name = 'drive-rsa-scores-f57d',
+                   taiga_version = 8),
+    CERES_CRISPR = list(mod_type = 'CERES', dataset = 'CRISPR', type = 'abs',
+                 taiga_name = 'avana-public-tentative-18q1-92d9',
+                 taiga_version = 5,
+                 taiga_file = 'gene_effect')
+)
+
+feature_datasets <- list(
+    GE = list(taiga_name = 'ccle-rnaseq-logrpkm-protein-coding-2700',
+              taiga_version = 1, 
+              transpose = T),
+    CN = list(taiga_name = 'depmap-wes-cn-data-97cc', 
+              taiga_version = 3, 
+              data.file = 'public_18q1_gene_cn'),
+    MUT = list(taiga_name = 'ccle-mutation-data-full-', taiga_version = 2)
+)
+
+hart_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data.version=1, data.file='hart_pos_controls')$Gene_ID
+hart_non_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data.version=1, data.file='hart_neg_controls')$Gene_ID
+
+load('~/CPDS/data/CCLE/Annotations.RData')
+
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=1, data.file='CP1175_20171102_19mer')
+Gene_ID_to_symb <- sh_targets %>% 
+    filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
+    dplyr::select(`Gene Symbol`, `Gene ID`) %>% 
+    distinct(`Gene ID`, .keep_all=T)
+Gene_ID_to_symb <- Gene_ID_to_symb$`Gene Symbol` %>% set_names(Gene_ID_to_symb$`Gene ID`)
+Gene_symb_to_ID <- names(Gene_ID_to_symb) %>% set_names(Gene_ID_to_symb)
+
+related_genes <- load.from.taiga(data.name='related-features-dcbd', data.version=2)
+
+CRISPR_benchmarks <- read.csv('~/CPDS/demeter2/results/top_CRISPR_biomarkers.csv', stringsAsFactors = F, check.names = F) %>% 
+    mutate()
+
+```
+
+```{r}
+export_fig <- function(fig_name, width, height, type = 'png', plot = NULL) {
+    if (is.null(plot)) {
+        plot <- last_plot()
+    }
+    if (type == 'png') {
+        ggsave(file.path(fig_dir, paste0(fig_name, '.png')), 
+               width = width, height = height, dpi=350, plot = plot)
+    } else if (type == 'pdf') {
+        ggsave(file.path(fig_dir, paste0(fig_name, '.pdf')), 
+               width = width, height = height, plot = plot, device = cairo_pdf())
+    }
+}
+```
+
+
+```{r, include = FALSE}
+dep_dnames <- names(dep_datasets) %>% set_names(names(dep_datasets))
+dep_data <- load_all_dep_data(dep_dnames, dep_datasets, include_gene_families = include_gene_families, use_bayes = use_bayes)
+if (colnames(dep_data$D1_Marc$gene_scores)[1] %in% sh_targets$`Gene Symbol`) {
+    colnames(dep_data$D1_Marc$gene_scores) <- Gene_symb_to_ID[colnames(dep_data$D1_Marc$gene_scores)]
+}
+```
+
+```{r}
+#calculate hairpins per gene stats per dataset
+Ach_hp_data <- read.csv(file.path(dep_data$D2_Ach$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) 
+Ach_hp_by_gene <- Ach_hp_data %>% 
+    dplyr::select(hp) %>% 
+    left_join(sh_targets, by = c('hp' = 'Barcode Sequence')) %>% 
+    filter(!grepl('NO_CURRENT', 'Gene ID')) %>% 
+    group_by(`Gene ID`) %>% 
+    summarise(n = n()) %>% 
+    filter(n >= min_hps_per_gene)
+sprintf('Ach data, %d hps targeting %d genes, with %f hps per gene avg. %f median', nrow(Ach_hp_data), nrow(Ach_hp_by_gene),
+        mean(Ach_hp_by_gene$n), median(Ach_hp_by_gene$n))
+
+DR_hp_data <- read.csv(file.path(dep_data$D2_DRIVE$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) 
+DR_hp_by_gene <- DR_hp_data %>% 
+    dplyr::select(hp) %>% 
+    left_join(sh_targets, by = c('hp' = 'Barcode Sequence')) %>% 
+    filter(!grepl('NO_CURRENT', 'Gene ID')) %>% 
+    group_by(`Gene ID`) %>% 
+    summarise(n = n()) %>% 
+    filter(n >= min_hps_per_gene)
+sprintf('DRIVE data, %d hps targeting %d genes, with %f hps per gene avg. %f median', nrow(DR_hp_data), nrow(DR_hp_by_gene),
+        mean(DR_hp_by_gene$n), median(DR_hp_by_gene$n))
+```
+
+
+```{r, include = FALSE}
+#CALCULATE MEAN GEFF PER GENE AND FILTER OUT BAD GENES
+target_dsets <- grep('D2', names(dep_data), value = TRUE)
+
+avg_Geffs <- data.frame()
+for (cur_dset in target_dsets) {
+    cur_avg_Geff <- read.csv(file.path(dep_data[[cur_dset]]$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) %>% 
+    dplyr::select(Geff, Seff, hp) %>% 
+        left_join(sh_targets %>% dplyr::select(hp = `Barcode Sequence`, Gene_ID = `Gene ID`), by = 'hp') %>% 
+        group_by(Gene_ID) %>% 
+        summarise(mean_Geff = mean(Geff), sum_Geff = sum(Geff), n_hps = n())
+    
+    #eliminate any genes with either low mean Geff, low sum Geff, OR too few hps
+    bad_genes <- cur_avg_Geff %>% 
+        filter(Gene_ID %in% colnames(dep_data[[cur_dset]]$gene_scores),
+               mean_Geff < min_avg_Geff | sum_Geff < min_sum_Geff | n_hps < min_hps_per_gene) %>% 
+        .[['Gene_ID']]
+    print(sprintf('%s: removing %d/%d bad genes', cur_dset, length(bad_genes), ncol(dep_data[[cur_dset]]$gene_scores)))
+    dep_data[[cur_dset]]$gene_scores[, bad_genes] <- NA
+    dep_data[[cur_dset]]$gene_score_SDs[, bad_genes] <- NA
+    
+    avg_Geffs %<>% rbind(cur_avg_Geff %>% mutate(dset = cur_dset))
+}
+
+```
+
+```{r, include = FALSE}
+#REMOVE D2 genes that are all NA
+target_dsets <- grep('D2', names(dep_data), value = TRUE)
+
+for (cur_dset in target_dsets) {
+    dep_data[[cur_dset]]$gene_scores <- dep_data[[cur_dset]]$gene_scores[, colSums(!is.na(dep_data[[cur_dset]]$gene_scores)) > 0]
+    dep_data[[cur_dset]]$gene_score_SDs <- dep_data[[cur_dset]]$gene_score_SDs[, colSums(!is.na(dep_data[[cur_dset]]$gene_score_SDs)) > 0]
+}
+
+```
+
+
+```{r, include = FALSE}
+#get complete set of genes and CLs
+all_dep_genes <- Reduce(union, llply(dep_data, function(d) {colnames(d$gene_scores)}))
+all_dep_CLs <- Reduce(union, llply(dep_data, function(d) {rownames(d$gene_scores)}))
+
+#load feature data
+feature_dnames <- names(feature_datasets) %>% set_names(names(feature_datasets))
+feature_data <- load_all_feature_data(feature_dnames, feature_datasets, NULL, all_dep_CLs)
+
+#load curated benchmark set of feature-dep relationships
+curated_benchmarks <- read.csv('~/CPDS/data/general/benchmark_list_cleaned.csv', stringsAsFactors = F, check.names=F) %>% 
+    mutate(Dep_Gene_ID = Gene_symb_to_ID[Dependency],
+           Feature_gene_ID = Gene_symb_to_ID[Feature]) %>% 
+    filter(Feature_matrix %in% c('CN', 'GE', 'MUT_DAM', 'MUT_HOT', 'MUT_MIS')) %>% dplyr::rename(feat_type = Feature_matrix, Dep_Gene = Dependency, Feat_gene = Feature) %>% 
+    mutate(feature_avail = data_available(Feature_gene_ID, feat_type, feature_data)) %>% 
+    filter(feature_avail) %>% 
+    distinct(Feat_gene, Dep_gene, feat_type, .keep_all=T)
+
+#only take genes without missing data
+feature_data$CN <- feature_data$CN[, colSums(is.na(feature_data$CN)) == 0]
+
+# for each dataset, restrict analysis to genes which appear in D2 scores for that dataset
+for (dset in names(dep_data)) {
+    if (grepl('Ach', dset) & dset != 'd2_Ach') {
+        dep_data[[dset]]$gene_scores <- dep_data[[dset]]$gene_scores[, colnames(dep_data[[dset]]$gene_scores) %in% colnames(dep_data$D2_Ach$gene_scores)]
+    } else if (grepl('DRIVE', dset) & dset != 'D2_DRIVE') {
+         dep_data[[dset]]$gene_scores <- dep_data[[dset]]$gene_scores[, colnames(dep_data[[dset]]$gene_scores) %in% colnames(dep_data$D2_DRIVE$gene_scores)]
+    } else if (grepl('Marc', dset) & dset != 'D2_Marc') {
+         dep_data[[dset]]$gene_scores <- dep_data[[dset]]$gene_scores[, colnames(dep_data[[dset]]$gene_scores) %in% colnames(dep_data$D2_Marc$gene_scores)]
+    } else if (grepl('comb', dset) & dset != 'D2_comb') {
+         dep_data[[dset]]$gene_scores <- dep_data[[dset]]$gene_scores[, colnames(dep_data[[dset]]$gene_scores) %in% colnames(dep_data$D2_comb$gene_scores)]
+    }
+}
+
+#set of genes and CLs common across datasets
+common_dep_genes <- Reduce(intersect, llply(dep_data, function(d) {colnames(d$gene_scores)}))
+common_dep_CLs <- Reduce(intersect, llply(dep_data, function(d) {rownames(d$gene_scores)}))
+RNAi_common_dep_genes <- Reduce(intersect, 
+                                llply(dep_data[setdiff(names(dep_data), 'CERES_CRISPR')], function(d) {colnames(d$gene_scores)}))
+RNAi_common_dep_CLs <- Reduce(intersect, 
+                              llply(dep_data[setdiff(names(dep_data), 'CERES_CRISPR')], function(d) {rownames(d$gene_scores)}))
+
+#parse CRISPR benchmark dep-feature set
+CRISPR_benchmarks %<>% mutate(Dep_Gene_ID = str_match(Dep_gene, ' \\((.+)\\)')[,2],
+                              Feature_gene_ID = str_match(Feature_gene, ' \\((.+)\\)')[,2]) %>% 
+    mutate(feature_avail = data_available(Feature_gene_ID, feat_type, feature_data)) %>% 
+    filter(!is.na(Dep_Gene_ID), feature_avail)
+CRISPR_benchmarks %<>% 
+    filter(abs(cor) > bench_cor_thresh) %>% 
+    group_by(feat_type) %>% 
+    top_n(n = n_bench_biomarkers_per_type, wt = abs(cor)) %>% 
+    ungroup() 
+
+```
+
+```{r, include = FALSE}
+# MAKE manual merge of 3 datasets 
+D1_merge <- make.a.tidy.dataset(
+    list(Ach = dep_data$D1_Ach$gene_scores,
+         DRIVE = dep_data$D1_DRIVE$gene_scores,
+         Marc = dep_data$D1_Marc$gene_scores),
+    na.cols = TRUE, na.rows = TRUE, dim.names = c('CCLE_ID', 'Gene')
+)
+D1_merge$Avg <- rowMeans(D1_merge[, c('Ach', 'DRIVE', 'Marc')], na.rm=T)
+D1_merge %<>%
+    dplyr::select(CCLE_ID, Gene, Avg) %>%
+    spread(Gene, Avg)
+D1_merge %<>% remove_rownames() %>% column_to_rownames(var = 'CCLE_ID')
+dep_datasets$D1_merge <- list(
+    type = 'rel', mod_type = 'ATARiS'
+)
+dep_data$D1_merge <- list(type = 'rel', mod_type = 'D1',
+                         gene_scores = as.matrix(D1_merge))
+```
+
+```{r, include = FALSE}
+#make consistent naming for CLs in Marcotte dataset
+Marc_CLs <- str_match(rownames(dep_data$D2_Marc$gene_scores), '(.+)_')[,2]
+rownames(dep_data$D1_merge$gene_scores)[rownames(dep_data$D1_merge$gene_scores) %in% Marc_CLs] <- paste0(rownames(dep_data$D1_merge$gene_scores)[rownames(dep_data$D1_merge$gene_scores) %in% Marc_CLs], '_BREAST')
+rownames(dep_data$GA_comb$gene_scores)[rownames(dep_data$GA_comb$gene_scores) %in% Marc_CLs] <- paste0(rownames(dep_data$GA_comb$gene_scores)[rownames(dep_data$GA_comb$gene_scores) %in% Marc_CLs], '_BREAST')
+```
+
+
+
+```{r, include = FALSE}
+#normalize each dataset
+cur_gene_avgs <- get_gene_avgs(dep_data, names(dep_data), hart_ess, hart_non_ess, use_bayes = use_bayes)
+
+for (cur_dset in names(dep_datasets)) {
+    if (dep_datasets[[cur_dset]]$type == 'abs') {
+         if (normalization == 'global_z') {
+            if (!is.null(dep_data[[cur_dset]]$gene_score_SDs)) {
+                    dep_data[[cur_dset]]$gene_score_SDs <- dep_data[[cur_dset]]$gene_score_SDs / sd(dep_data[[cur_dset]]$gene_scores, na.rm=T)
+            }            
+            dep_data[[cur_dset]]$gene_scores <- dep_data[[cur_dset]]$gene_scores / sd(dep_data[[cur_dset]]$gene_scores, na.rm=T)
+        } else if (normalization == 'pos_neg') {
+            cur_GA <- cur_gene_avgs %>% filter(dset == cur_dset)
+            pos_median <- cur_GA %>% filter(gene_type == 'essential') %>% .[['avg_score']] %>% median(na.rm=T)
+            neg_median <- cur_GA %>% filter(gene_type == 'non_essential') %>% .[['avg_score']] %>% median(na.rm=T)
+            if (!is.null(dep_data[[cur_dset]]$gene_score_SDs)) {
+                dep_data[[cur_dset]]$gene_score_SDs <- dep_data[[cur_dset]]$gene_score_SDs / (neg_median - pos_median)
+            }
+            dep_data[[cur_dset]]$gene_scores <- (dep_data[[cur_dset]]$gene_scores - neg_median) / (neg_median - pos_median)
+        }         
+    } else {
+        #for relative dependency data force z-score normalization
+        if (!is.null(dep_data[[cur_dset]]$gene_score_SDs)) {
+                dep_data[[cur_dset]]$gene_score_SDs <- dep_data[[cur_dset]]$gene_score_SDs / sd(dep_data[[cur_dset]]$gene_scores, na.rm=T)
+        }            
+        dep_data[[cur_dset]]$gene_scores <- dep_data[[cur_dset]]$gene_scores / sd(dep_data[[cur_dset]]$gene_scores, na.rm=T)
+    }
+}
+
+```
+
+
+```{r}
+#load CL data for Achilles and DRIVE
+Ach_CL_data <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F, check.names=F)
+
+DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F, check.names = F)
+```
+
+
+
+```{r, include = FALSE}
+#calculate per-gene averages and SDs
+gene_avgs <- get_gene_avgs(dep_data, names(dep_datasets), hart_ess, hart_non_ess, use_bayes = use_bayes) %>% 
+    mutate(Gene = as.character(Gene))
+
+gene_SDs <- get_gene_SDs(dep_data, names(dep_datasets), hart_ess, hart_non_ess, use_bayes = use_bayes) %>% 
+    mutate(Gene = as.character(Gene))
+
+gene_avgs_wide <- spread(gene_avgs, dset, avg_score)
+```
+
+```{r, include = FALSE}
+#Compute SSMD of pos-neg controls for each dataset
+only_overlapping_genes <- FALSE
+ov_gene_sep_stats <- get_gene_avg_stats(dep_data, gene_avgs, names(dep_datasets), only_overlapping_genes, use_bayes = use_bayes)
+
+ov_gene_sep_stats_overlap <- get_gene_avg_stats(dep_data, gene_avgs, c('D2_Ach', 'D2_DRIVE', 'GA_Ach', 'GA_DRIVE'), only_overlapping_genes = TRUE, use_bayes = use_bayes)
+
+```
+
+
+```{r, include = FALSE}
+#Calculate pos-neg sep per CL
+only_overlapping_genes <- FALSE
+neg_control_type <- 'unexpressed'
+# neg_control_type <- 'non_essential'
+
+per_CL_stats <- get_per_CL_stats(dep_data, names(dep_datasets), only_overlapping_genes, neg_control_type, feature_data$GE, hart_ess, hart_non_ess, use_bayes = use_bayes)
+
+```
+
+# Figure 1: accurate identification of essential genes
+
+## 1b: Per-gene avg SSMD across datasets
+
+Comparison of D2 vs gene-averaging pos/neg control separation (pop-avg gene scores) SSMD across datasets
+
+```{r, fig.width = 5, fig.height = 4}
+dset_map <- c(Ach = 'Achilles', DRIVE = 'DRIVE')
+
+ov_gene_sep_stats %<>% 
+    mutate(model = str_match(as.vector(dset),'(.+)_.+')[,2],
+          data = dset_map[str_match(as.vector(dset),'[:alnum:]+_(.+)')[,2]],
+          dset = str_replace_all(dset, '_', ' '))
+ov_gene_sep_stats %<>% mutate(dset = factor(dset, levels = ov_gene_sep_stats %>% arrange(desc(ssmd)) %>% .[['dset']]))
+ggplot(ov_gene_sep_stats %>% 
+           filter(grepl('DRIVE', dset) | grepl('Ach', dset)),
+       aes(dset, ssmd, fill = model)) +
+    geom_bar(stat = 'identity', lwd = 3) +
+    ylab('Cell line avg. dependency\npos/neg separation (SSMD)') +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
+    guides(fill = guide_legend(title = element_blank()))
+
+export_fig('GSavg_SSMD_compare', width = 3.5, height = 3.5)
+export_fig('GSavg_SSMD_compare', width = 3.5, height = 3.5, 'pdf')
+
+```
+
+
+## 1c: Per-gene avg agreement with CRISPR across datasets
+
+Compare correlations of pop-avg gene scores with CRISPR
+
+```{r, fig.width=5, fig.height=4.5}
+use_common_genes <- FALSE
+
+if (use_common_genes) {
+    cur_gene_avgs <- gene_avgs_wide %>% filter(Gene %in% common_dep_genes)
+} else {
+    cur_gene_avgs <- gene_avgs_wide
+}
+CERES_cors <- cor(cur_gene_avgs[, grepl('Ach', colnames(cur_gene_avgs)) | grepl('DRIVE', colnames(cur_gene_avgs))], cur_gene_avgs[, 'CERES_CRISPR', drop=F],
+              use = 'pairwise.complete.obs')
+
+Ach_DRIVE_D2 <- cor(cur_gene_avgs$D2_Ach, cur_gene_avgs$D2_DRIVE, use = 'pairwise.complete.obs')
+Ach_DRIVE_GA <- cor(cur_gene_avgs$GA_Ach, cur_gene_avgs$GA_DRIVE, use = 'pairwise.complete.obs')
+Ach_DRIVE_RSA <- cor(cur_gene_avgs$RSA_Ach, cur_gene_avgs$RSA_DRIVE, use = 'pairwise.complete.obs')
+
+df <- data.frame(CERES_cors) %>% 
+    rownames_to_column(var = 'dset') %>% 
+    set_colnames(c('dset', 'cor')) %>% 
+    filter(grepl('D2', dset) | grepl('GA', dset) | grepl('RSA', dset)) %>% 
+    mutate(dset = paste0(dset, '_CRISPR')) %>% 
+    rbind(data.frame(dset = 'D2_Ach_DRIVE', cor = Ach_DRIVE_D2)) %>% 
+    rbind(data.frame(dset = 'GA_Ach_DRIVE', cor = Ach_DRIVE_GA)) %>% 
+    rbind(data.frame(dset = 'RSA_Ach_DRIVE', cor = Ach_DRIVE_RSA))
+
+df %<>% mutate(model = str_match(dset, '^([:alnum:]+)_')[,2],
+        relat = str_match(dset, '^[:alnum:]+_(.+)')[,2], 
+       dset = str_replace_all(dset, '_', ' '), 
+       type = ifelse(grepl('CRISPR', dset), 'RNAi/CRISPR', 'RNAi/RNAi'))
+df %<>% mutate(dset = factor(dset, levels = df %>% arrange(desc(cor)) %>% .[['dset']]))
+
+g <- ggplot(df, 
+       aes(dset, cor, fill = model, alpha = type)) + 
+    geom_bar(stat = 'identity') +
+    ylab('Cell line avg. correlation') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(1))) +
+    scale_alpha_discrete(range = c(1, 0.6)) +
+    guides(fill = guide_legend(nrow=2), alpha = guide_legend(nrow=2))
+if (fig_dir == '~/CPDS/demeter2/results/post_figures') {
+    g <- g + guides(alpha = FALSE)
+}
+export_fig('GSavg_CRISPR_cor_compare', plot = g, width = 4, height = 4.5)
+export_fig('GSavg_CRISPR_cor_compare', plot = g, width = 4, height = 4.5, 'pdf')
+# ggsave(file.path(fig_dir, 'GSavg_CRISPR_cor_compare.png'), plot = g, width = 4, height = 4.5, dpi=350)
+
+ymax <- max(df$cor)
+ggplot(df %>% filter(relat == 'DRIVE_CRISPR'), 
+       aes(model, cor, fill = model)) + 
+    geom_bar(stat = 'identity') +
+    ylab('Cell line avg. correlation') +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(1))) +
+    guides(fill = FALSE) +
+    ylim(0, ymax)+
+    theme(axis.title.y = element_blank())
+export_fig('GSavg_DRIVE_CRISPR_cor', width = 1.5, height = 1.5)
+export_fig('GSavg_DRIVE_CRISPR_cor', width = 1.5, height = 1.5, 'pdf')
+
+ggplot(df %>% filter(relat == 'Ach_CRISPR'), 
+       aes(model, cor, fill = model)) + 
+    geom_bar(stat = 'identity') +
+    ylab('Cell line avg. correlation') +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(1))) +
+    guides(fill = FALSE)+
+    ylim(0, ymax)+
+    theme(axis.title.y = element_blank())
+export_fig('GSavg_Ach_CRISPR_cor', width = 1.5, height = 1.5)
+export_fig('GSavg_Ach_CRISPR_cor', width = 1.5, height = 1.5, 'pdf')
+
+ggplot(df %>% filter(relat == 'Ach_DRIVE'), 
+       aes(model, cor, fill = model)) + 
+    geom_bar(stat = 'identity') +
+    ylab('Cell line avg. correlation') +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(1))) +
+    guides(fill = FALSE)+
+    ylim(0, ymax) +
+    theme(axis.title.y = element_blank())
+export_fig('GSavg_Ach_DRIVE_cor', width = 1.5, height = 1.5)
+export_fig('GSavg_Ach_DRIVE_cor', width = 1.5, height = 1.5, 'pdf')
+
+
+print(sprintf('Ach-DRIVE D2: %.3f', df[df$dset == 'D2 Ach DRIVE', 'cor']))
+print(sprintf('Ach-DRIVE GA: %.3f', df[df$dset == 'GA Ach DRIVE', 'cor']))
+print(sprintf('Ach-DRIVE RSA: %.3f', df[df$dset == 'RSA Ach DRIVE', 'cor']))
+
+print(sprintf('D2 Ach CRISPR: %.3f', df[df$dset == 'D2 Ach CRISPR', 'cor']))
+print(sprintf('GA Ach CRISPR: %.3f', df[df$dset == 'GA Ach CRISPR', 'cor']))
+print(sprintf('RSA Ach CRISPR: %.3f', df[df$dset == 'RSA Ach CRISPR', 'cor']))
+
+print(sprintf('D2 DRIVE CRISPR: %.3f', df[df$dset == 'D2 DRIVE CRISPR', 'cor']))
+print(sprintf('GA DRIVE CRISPR: %.3f', df[df$dset == 'GA DRIVE CRISPR', 'cor']))
+print(sprintf('RSA DRIVE CRISPR: %.3f', df[df$dset == 'RSA DRIVE CRISPR', 'cor']))
+
+```
+
+## 1d distribution of SSMDs per CL
+
+```{r}
+point_size = 0.75
+point_alpha = 0.75
+df <- per_CL_stats %>% 
+    dplyr::select(CCLE_ID, dset, ssmd) %>% 
+    spread(dset, ssmd) %>% 
+    dplyr::select(CCLE_ID, GA_Ach, D2_Ach) %>% 
+    na.omit() %>% 
+    mutate(CL_rank = rank(GA_Ach, ties.method = 'first'))
+p1 <- ggplot(df) +
+  geom_segment(aes(x=CL_rank, xend=CL_rank, y=GA_Ach, yend=D2_Ach),
+               color="grey80", size=0.5) +
+  geom_point(aes(x=CL_rank, y=GA_Ach, color='GA'), cex = point_size, alpha = point_alpha) +
+  geom_point(aes(x=CL_rank, y=D2_Ach, color='D2'), cex = point_size, alpha = point_alpha) +
+    xlab('Cell line rank') +
+    ylab('Pos/neg control\nseparation (SSMD)') +
+    ggtitle('Achilles') +
+    guides(color = guide_legend(title = element_blank(), override.aes = list(size =  3))) +
+    scale_color_manual(values = mod_type_pal) +
+    ylim(0,3) +
+    # geom_hline(yintercept = ov_gene_sep_stats %>% filter(dset == 'D2_Ach') %>% .[['ssmd']]) +
+    # geom_hline(yintercept = ov_gene_sep_stats %>% filter(dset == 'GA_Ach') %>% .[['ssmd']], color = 'red') +
+    # scale_colour_Publication() + 
+    theme_Publication(base_font) +
+    theme(legend.key.width = unit(0.75, 'cm'))
+
+df <- per_CL_stats %>% 
+    dplyr::select(CCLE_ID, dset, ssmd) %>% 
+    spread(dset, ssmd) %>% 
+    dplyr::select(CCLE_ID, GA_DRIVE, D2_DRIVE) %>% 
+    na.omit() %>% 
+    mutate(CL_rank = rank(GA_DRIVE, ties.method = 'first'))
+p2 <- ggplot(df) +
+  geom_segment(aes(x=CL_rank, xend=CL_rank, y=GA_DRIVE, yend=D2_DRIVE),
+               color="grey80", size=0.5) +
+  geom_point(aes(x=CL_rank, y=GA_DRIVE, color='GA'), cex = point_size, alpha = point_alpha) +
+  geom_point(aes(x=CL_rank, y=D2_DRIVE, color='D2'), cex = point_size, alpha = point_alpha) +
+   xlab('Cell line rank') +
+    ylab('Pos/neg control\nseparation (SSMD)') +
+    ggtitle('DRIVE') +
+    guides(color = guide_legend(title = element_blank(), override.aes = list(size =  3))) +
+    scale_color_manual(values = mod_type_pal) +
+    ylim(0,3) +
+   # geom_hline(yintercept = ov_gene_sep_stats %>% filter(dset == 'D2_DRIVE') %>% .[['ssmd']]) +
+  # geom_hline(yintercept = ov_gene_sep_stats %>% filter(dset == 'GA_DRIVE') %>% .[['ssmd']], color = 'red') + # scale_colour_Publication() + 
+    theme_Publication(base_font)
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+export_fig('CL_posneg_compare_ssmd', width = 6, height = 3.5, plot = p)
+export_fig('CL_posneg_compare_ssmd', width = 6, height = 3.5, plot = p, type = 'pdf')
+
+p1 <- ggplot(per_CL_stats %>% 
+           filter(dset %in% c('D2_Ach', 'GA_Ach', 'RSA_Ach')) %>% 
+           mutate(model = str_match(dset, '(.+)_')[,2]),
+       aes(ssmd, fill = model)) + 
+    geom_density(alpha = 0.6) + 
+    scale_fill_manual(values = mod_type_pal) +
+    # coord_cartesian(xlim = c(0,1)) +
+    theme_Publication(base_font) +
+    xlim(0,3) + 
+    xlab('Pos/neg separation (SSMD)') +
+    ylab('Density') +
+    ggtitle('Achilles') +
+    guides(fill = guide_legend(title = element_blank()))
+
+p2 <- ggplot(per_CL_stats %>% 
+           filter(dset %in% c('D2_DRIVE', 'GA_DRIVE', 'RSA_DRIVE')) %>% 
+           mutate(model = str_match(dset, '(.+)_')[,2]),
+       aes(ssmd, fill = model)) + 
+    geom_density(alpha = 0.6) + 
+    scale_fill_manual(values = mod_type_pal) +
+    # coord_cartesian(xlim = c(0,1)) +
+    theme_Publication(base_font) +
+    xlim(0,3) + 
+    xlab('Pos/neg separation (SSMD)') +
+    ylab('Density') +
+    ggtitle('DRIVE') +
+    guides(fill = guide_legend(title = element_blank()))
+
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+export_fig('CL_ssmd_dists', width = 6, height = 3.5, plot = p)
+export_fig('CL_ssmd_dists', width = 6, height = 3.5, plot = p, type = 'pdf')
+
+```
+
+Stats of perCL SSMD improvements
+
+```{r}
+df <- per_CL_stats %>% 
+    dplyr::select(CCLE_ID, dset, ssmd) %>% 
+    spread(dset, ssmd) %>% 
+    mutate(D2_Ach_vs_GA_Ach = D2_Ach > GA_Ach,
+           D2_Ach_vs_RSA_Ach = D2_Ach > RSA_Ach,
+           D2_DRIVE_vs_GA_DRIVE = D2_DRIVE > GA_DRIVE,
+           D2_DRIVE_vs_RSA_DRIVE = D2_DRIVE > RSA_DRIVE,
+           D2_Ach_GA_imp = (D2_Ach - GA_Ach)/GA_Ach*100,
+           D2_Ach_RSA_imp = (D2_Ach - RSA_Ach)/RSA_Ach*100,
+           D2_DRIVE_GA_imp = (D2_DRIVE - GA_DRIVE)/GA_DRIVE*100,
+           D2_DRIVE_RSA_imp = (D2_DRIVE - RSA_DRIVE)/RSA_DRIVE*100) 
+print(sprintf('Achilles D2 avg percent improvement over GA: %.3f, over RSA: %.3f across %d/%d cell lines', mean(df$D2_Ach_GA_imp, na.rm=T), mean(df$D2_Ach_RSA_imp, na.rm=T), sum(df$D2_Ach_GA_imp > 0, na.rm=T), sum(!is.na(df$D2_Ach_GA_imp))))
+print(sprintf('DRIVE D2 avg percent improvement over GA: %.3f, over RSA: %.3f across %d/%d cell lines', mean(df$D2_DRIVE_GA_imp, na.rm=T), mean(df$D2_DRIVE_RSA_imp, na.rm=T), sum(df$D2_DRIVE_GA_imp > 0, na.rm=T), sum(!is.na(df$D2_DRIVE_GA_imp))))
+
+```
+
+```{r}
+#Calculate pos-neg sep per CL
+neg_control_type <- 'unexpressed'
+
+per_CL_stats_overlap <- get_per_CL_stats(dep_data, c('D2_DRIVE', 'D2_Ach', 'GA_DRIVE', 'GA_Ach'), only_overlapping_genes = TRUE, neg_control_type, feature_data$GE, hart_ess, hart_non_ess, use_bayes = use_bayes)
+
+df <- per_CL_stats_overlap %>% 
+    dplyr::select(CCLE_ID, dset, ssmd) %>% 
+    spread(dset, ssmd) %>% 
+    mutate(D2_Ach_DRIVE_imp = (D2_DRIVE - D2_Ach)/D2_Ach*100,
+           GA_Ach_DRIVE_imp = (GA_DRIVE - GA_Ach)/GA_Ach*100) 
+
+```
+
+
+# Figure 2: Removal of AGO2-related biases
+
+## 2a: Examples of high and low-quality cell lines
+
+When using methods such as gene-averaging, which do not explicitly account for variable RNAi effiacy, cell linese with lower screen quality show systematically less dependence on a broad range of essential genes compared to cell lines with high screen quality. This bias is removed with D2, such that the gene scores for low= and high-quality CLs are 'aligned' to the average
+
+```{r, fig.width = 7, fig.height = 10}
+test_CLs <- c('A3KAW_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE', 'HT29_LARGE_INTESTINE')
+
+dep_name <- 'GA_Ach'
+p1 <- make_CL_vs_avg_plot(dep_name, test_CLs, gene_avgs) +
+    scale_color_manual(values = gene_type_pal) +
+    ggtitle('Gene-averaging (GA)') +
+    # scale_colour_Publication() +
+    scale_x_continuous(breaks = c(-2,-1,0)) +
+    scale_y_continuous(breaks = c(-2,-1,0)) +
+    # coord_cartesian(xlim=c(-2,0.75), ylim = c(-2,0.75)) +
+    theme_Publication(base_font) 
+
+
+dep_name <- 'D2_Ach'
+p2 <- make_CL_vs_avg_plot(dep_name, test_CLs, gene_avgs) +
+    ggtitle('D2') +
+    scale_color_manual(values = gene_type_pal) +
+    # scale_colour_Publication() +
+    scale_x_continuous(breaks = c(-2,-1,0)) +
+    scale_y_continuous(breaks = c(-2,-1,0)) +
+    theme_Publication(base_font) 
+
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=2),
+             mylegend, nrow=2,heights=c(18, 1))
+ggsave(file.path(fig_dir, 'ind_example_MA_compare.png'), plot = p, width = 5, height = 7, dpi = 350)
+
+```
+
+
+
+
+## 2b: RNAi efficacy correlates with AGO2 GE
+
+Inferred RNAi efficacy correlates with measured AGO2 gene expression across cell lines in both Achilles and DRIVE datasets
+
+```{r, fig.width=5, fig.height=4}
+df <- data.frame(AGO2_GE = feature_data$GE[, '27161'], CCLE_ID = rownames(feature_data$GE)) %>% 
+    left_join(Ach_CL_data %>% dplyr::select(Ach_gene_slope = gene_slope, CCLE_ID), by = 'CCLE_ID') %>% 
+    left_join(DRIVE_CL_data %>% dplyr::select(DRIVE_gene_slope = gene_slope, CCLE_ID), by = 'CCLE_ID') %>% 
+    left_join(per_CL_stats %>% filter(dset == 'GA_Ach') %>% dplyr::select(CCLE_ID, Ach_GA_ssmd = ssmd, Ach_GA_pcm = pos_med), by = 'CCLE_ID') %>% 
+    left_join(per_CL_stats %>% filter(dset == 'GA_DRIVE') %>% dplyr::select(CCLE_ID, DRIVE_GA_ssmd = ssmd, DRIVE_GA_pcm = pos_med), by = 'CCLE_ID')
+
+ggplot(df, aes(AGO2_GE)) + 
+    ylab('Screen signal') +
+    xlab('AGO2 Gene expression (logTPM)') +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles')) +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE')) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE'), method = 'lm', lwd = 0.75) +
+    guides(fill = guide_legend(title = '')) +
+    scale_y_log10() +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication(base_font)
+ggsave(file.path(fig_dir, 'AGO2_vs_RNAi_eff.png'), width = 4, height = 3.5, dpi = 350)
+
+ggplot(df, aes(AGO2_GE)) + 
+    ylab('Screen quality (SSMD)') +
+    xlab('AGO2 Gene expression (logTPM)') +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_GA_ssmd, fill = 'Achilles')) +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_GA_ssmd, fill = 'DRIVE')) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_GA_ssmd, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = DRIVE_GA_ssmd, fill = 'DRIVE'), method = 'lm', lwd = 0.75) +
+    guides(fill = guide_legend(title = '')) +
+    # scale_y_log10() +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication(base_font)
+ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 4, height = 3.5, dpi = 350)
+with(df, cor.test(AGO2_GE, Ach_GA_ssmd))
+with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd))
+
+ggplot(df, aes(AGO2_GE)) + 
+    ylab('Common-essential\nmedian dependency') +
+    xlab('AGO2 Gene expression (logTPM)') +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_GA_pcm, fill = 'Achilles')) +
+    geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_GA_pcm, fill = 'DRIVE')) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_GA_pcm, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
+    geom_smooth(alpha = 0.25, color = 'white', aes(y = DRIVE_GA_pcm, fill = 'DRIVE'), method = 'lm', lwd = 0.75) +
+    guides(fill = guide_legend(title = '')) +
+    # scale_y_log10() +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication(base_font)
+ggsave(file.path(fig_dir, 'AGO2_vs_pcm.png'), width = 4, height = 3.5, dpi = 350)
+
+```
+
+## 2c: Per-gene dependency correlations with AGO2 GE
+
+```{r, include = FALSE}
+#GET CORRS BETWEEN AGO2 GE AND GENE SCORE FOR EACH GENE
+vector <- feature_data$GE[, '27161'] %>% set_names(rownames(feature_data$GE))
+
+target_deps <- setdiff(names(dep_data), 'CERES_CRISPR')
+AGO2_cors <- get_matrix_vector_corrs(dep_data, target_deps, vector, use_bayes = use_bayes) %>% 
+    mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess)) %>% 
+    left_join(gene_avgs %>% 
+         filter(dset == 'D2_Ach') %>% 
+         dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+     by = "Gene") %>% 
+    left_join(gene_avgs %>% 
+         filter(dset == 'D2_DRIVE') %>% 
+         dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+     by = "Gene")
+```
+
+```{r, fig.width=8, fig.height=5}
+cur_dset <- 'D1_Ach'
+p1 <- ggplot(AGO2_cors %>% filter(model == cur_dset), 
+       aes(avg_essentiality_Ach, cor, color = gene_type)) +
+        geom_point(alpha = 0.75, size = 0.75, color = 'grey') +
+        geom_density_2d(data = filter(AGO2_cors, model == cur_dset, gene_type != 'other'),
+                        aes(color = gene_type)) +
+        coord_cartesian(xlim = c(-1.5, 0.5), ylim=c(-0.5, 0.3)) +
+    geom_hline(yintercept = 0, linetype = 'dashed') +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Gene type', override.aes = list(lwd = 3))) + 
+    # scale_fill_Publication() +
+    scale_color_manual(values = gene_type_pal) +
+    ggtitle('D1') +
+    theme_Publication(base_font)
+
+cur_dset <- 'D2_Ach'
+p2 <- ggplot(AGO2_cors %>% filter(model == cur_dset), 
+       aes(avg_essentiality_Ach, cor, color = gene_type)) +
+        geom_point(alpha = 0.75, size = 0.75, color = 'grey') +
+        geom_density_2d(data = filter(AGO2_cors, model == cur_dset, gene_type != 'other'),
+                        aes(color = gene_type)) +
+        coord_cartesian(xlim = c(-1.5, 0.5), ylim=c(-0.5, 0.3)) +
+    geom_hline(yintercept = 0, linetype = 'dashed') +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Gene type', override.aes = list(lwd = 3))) + 
+    # scale_fill_Publication() +
+    scale_color_manual(values = gene_type_pal) +
+    ggtitle('D2') +
+    theme_Publication(base_font)
+
+mylegend <- g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'AGO2_corrs_scatter.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+
+```
+
+## 2d: Removal of AGO2 GE correlations for Achilles and DRIVE datasets
+
+While AGO2 GE shows systematic anticorrelation with essential genes when using D1, this relationship is removed with D2
+
+```{r, fig.width=5, fig.height=4}
+AGO2_cors %<>% mutate(mod = str_match(model, '([:alnum:]+)_[:alnum:]+')[,2],
+                      dat = str_match(model, '[:alnum:]+_([:alnum:]+)')[,2],
+                      mod = factor(mod, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA')))
+p1 <- ggplot(AGO2_cors %>% filter(grepl("Ach", model)), 
+       aes(avg_essentiality_Ach, cor, color = mod)) + 
+    geom_smooth(se = TRUE, alpha = 0.2, lwd = 1) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.4, 0.15)) +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Model', nrow = 2, override.aes = list(lwd = 3))) +
+    scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    ggtitle('Achilles') 
+
+p2 <- ggplot(AGO2_cors %>% filter(grepl("DRIVE", model)), 
+       aes(avg_essentiality_DRIVE, cor, color = mod)) + 
+    geom_smooth(se = TRUE, alpha = 0.2, lwd = 1) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.4, 0.15)) +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Model', nrow = 2, override.aes = list(lwd = 3))) +
+    scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    ggtitle('DRIVE')
+
+mylegend <- g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'AGO2_corrs_smooth.png'), plot = p, width = 7, height = 3.5, dpi = 350)
+
+```
+
+
+
+## 2g: D2 removes AGO2-related biases in dependency correlation matrices
+
+We calculate example dependency correlation matrices using a set of 250 high-variance genes, using the Achilles data. The correlation matrix exhibits strong correlations uniformly between pairs of essential genes with D1, this structure is eliminated with D2. 
+
+
+
+## Example corrnet fig
+
+```{r}
+D2_has_data <- colSums(!is.na(dep_data$D2_DRIVE$gene_scores))
+D2_has_data <- names(D2_has_data[D2_has_data > 0])
+available_genes <- gene_SDs %>%
+    filter(dset == 'D1_DRIVE', Gene %in% colnames(dep_data$D2_DRIVE$gene_scores), Gene %in% D2_has_data) %>%
+    .[['Gene']] %>%
+    as.vector()
+
+if (use_bayes) {
+    CL_avg_var <- rowMeans(dep_data$D2_DRIVE$gene_score_SDs^2, na.rm=T)
+    cur_weight <- 1/CL_avg_var
+} else {
+    cur_weight <- rep(1.0, nrow(dep_data$D2_DRIVE$gene_scores))
+}
+
+c_GA <- cor(dep_data$GA_DRIVE$gene_scores[, available_genes], use = 'pairwise.complete.obs')
+c_D1 <- cor(dep_data$D1_DRIVE$gene_scores[, available_genes], use = 'pairwise.complete.obs')
+c_D2 <- wtd.cors(dep_data$D2_DRIVE$gene_scores[, available_genes], weight = cur_weight)
+
+#get global z-score normalized correlation matrices
+c_GA_z <- c_GA
+c_D1_z <- c_D1
+c_D2_z <- c_D2
+diag(c_GA_z) <- NA
+diag(c_D1_z) <- NA
+diag(c_D2_z) <- NA
+c_GA_z <- (c_GA_z - mean(c_GA_z, na.rm=T))/sd(c_GA_z, na.rm=T)
+c_D1_z <- (c_D1_z - mean(c_D1_z, na.rm=T))/sd(c_D1_z, na.rm=T)
+c_D2_z <- (c_D2_z - mean(c_D2_z, na.rm=T))/sd(c_D2_z, na.rm=T)
+```
+
+```{r}
+q_gene <- 'MED14'
+q_gene_ID <- Gene_symb_to_ID[q_gene]
+
+cur_related_genes <- related_genes %>% 
+    filter(target == q_gene, source == 'CORUM') %>% 
+    .[['partner']] %>% 
+    Gene_symb_to_ID[.]
+
+df <- data.frame(Gene = colnames(c_D1), 
+                 GA_c = c_GA[q_gene_ID,],
+                 D1_c = c_D1[q_gene_ID,], 
+                 D2_c = c_D2[q_gene_ID,],
+                 GA_c_z = c_GA_z[q_gene_ID,],
+                 D1_c_z = c_D1_z[q_gene_ID,],
+                 D2_c_z = c_D2_z[q_gene_ID,]) %>% 
+    mutate(is_related = Gene %in% cur_related_genes) %>% 
+    mutate(Gene_symbol = Gene_ID_to_symb[as.character(Gene)]) %>% 
+    left_join(gene_avgs %>% filter(dset == 'D2_DRIVE'), by = 'Gene')
+
+make_net_plot <- function(cur_df, C_mat) {
+    max_nodes <- 20
+    min_size <- 10
+    max_size <- 30
+    cor_z_thresh <- 4
+    
+    #get max_nodes top correlated dependencies
+    node_df <- cur_df %>% 
+        arrange(desc(abs(cor))) %>% 
+        head(max_nodes) %>%
+        mutate(id = Gene,
+               label = Gene_symbol)
+        
+    node_df$color <- 'black'
+    node_df %<>% mutate(
+        color = ifelse(is_related, 'pink', 'lightgray'),
+        color = ifelse(Gene == q_gene_ID, 'skyblue', color)
+    )
+    
+    edge_df <- 
+        C_mat[node_df$Gene, node_df$Gene] %>% 
+        melt() %>% 
+        set_colnames(c('from', 'to', 'cor')) %>% 
+        mutate(cor_rank = percent_rank(-abs(cor)),
+               cor = abs(cor)) %>% 
+        # filter(cor_rank < cor_rank_thresh, from != to)
+        filter(cor > cor_z_thresh, from != to) 
+
+    edge_widths <- edge_df$cor/sd(edge_df$cor, na.rm=T)
+    
+    #build initial graph
+    graph <- igraph::graph_from_data_frame(d = edge_df,
+                                             vertices = node_df,
+                                             directed = FALSE)
+    
+    #remove any components that are not connected
+    is_connected <- sapply(node_df$id, function(target_ID) {
+         if (target_ID == q_gene_ID) {
+            return(TRUE)
+        } else {
+            return(igraph::edge_connectivity(graph, source = q_gene_ID, target = target_ID) > 0)
+        }
+    })
+    node_df %<>% 
+        mutate(is_connected = is_connected) %>% 
+        filter(is_connected)
+    edge_df %<>% filter(to %in% node_df$id, from %in% node_df$id)
+    
+    #rebuild graph
+    graph <- igraph::graph_from_data_frame(d = edge_df,
+                                             vertices = node_df,
+                                             directed = FALSE)
+    
+    #node size represents how common-essential each gene is
+    vertex_size <- -node_df[["avg_score"]] 
+    vertex_size <- vertex_size*(max_size - min_size) + min_size
+    vertex_size[is.na(vertex_size)] <- mean(vertex_size, na.rm=T)
+    
+    igraph::plot.igraph(graph,
+                          vertex.label.dist = 0,
+                          vertex.label = node_df$label,
+                          vertex.label.color = 'black',
+                          vertex.color = node_df$color,
+                          vertex.size = vertex_size*1,
+                          vertex.alpha = 0.75,
+                          vertex.shape = 'circle',
+                          edge.arrow.size = 0.1,
+                          edge.curved = 0.1,
+                          layout = layout_nicely,
+                          vertex.label.cex = 0.85,
+                          edge.width=edge_df$cor*0.5)
+}
+set.seed(1)
+pdf(file.path(fig_dir, 'GA_cornet_examp.pdf'), width = 5, height = 6)
+make_net_plot(df %>% mutate(cor = GA_c, cor_z = GA_c_z), c_GA_z)
+dev.off()
+pdf(file.path(fig_dir, 'D1_cornet_examp.pdf'), width = 5, height = 6)
+make_net_plot(df %>% mutate(cor = D1_c, cor_z = D1_c_z), c_D1_z)
+dev.off()
+pdf(file.path(fig_dir, 'D2_cornet_examp.pdf'), width = 5, height = 6)
+make_net_plot(df %>% mutate(cor = D2_c, cor_z = D2_c_z), c_D2_z)
+dev.off()
+
+```
+
+
+##2h: D2 removes pairwise correlation biases for pairs of essential genes
+
+Average gene-gene dependency correlations as a function of the average essentiality between the pair of genes. Shown for the top 1000 high-variance genes
+
+```{r}
+n_used_genes <- 2500
+cur_common_genes <- intersect(
+    colnames(dep_data$D2_Ach$gene_scores),
+    colnames(dep_data$D2_DRIVE$gene_scores)
+)
+high_var_genes <- gene_SDs %>% 
+    filter(Gene %in% cur_common_genes, dset %in% c('D1_Ach', 'D1_DRIVE')) %>% 
+    group_by(Gene) %>%
+    summarise(avg_SD = mean(SD_score)) %>%
+    arrange(desc(avg_SD)) %>%
+    head(n_used_genes) %>% 
+    .[['Gene']] %>% 
+    as.vector()
+
+target_dsets <- c('D1_DRIVE', 'D2_DRIVE', 'GA_DRIVE', 'D1_Ach', 'D2_Ach', 'GA_Ach')
+
+dep_cor_res <- ldply(target_dsets, function(cur_dset) {
+    print(cur_dset) 
+    if (use_bayes & !is.null(dep_data[[cur_dset]]$gene_score_SDs)) {
+    CL_avg_var <- rowMeans(dep_data[[cur_dset]]$gene_score_SDs^2, na.rm=T)
+    cur_weight <- 1/CL_avg_var
+    c_mat <- wtd.cors(dep_data[[cur_dset]]$gene_scores[, high_var_genes], weight = cur_weight)
+    } else {
+        c_mat <- cor(dep_data[[cur_dset]]$gene_scores[, high_var_genes], use = 'pairwise.complete.obs')
+    }
+    if (grepl('Ach', cur_dset)) {
+     avg_ess <- gene_avgs %>% 
+        filter(dset == 'D2_Ach')
+    } else if (grepl('DRIVE', cur_dset)) {
+       avg_ess <- gene_avgs %>% 
+        filter(dset == 'D2_DRIVE')
+    }
+    avg_ess <- avg_ess[match(high_var_genes, avg_ess$Gene), 'avg_score']
+    
+    a <- outer(avg_ess, avg_ess, '+') / 2
+    a <- a[lower.tri(a)]
+    c_mat <- c_mat[lower.tri(c_mat)]
+    
+    data.frame(cor = c_mat, a = a, dset = cur_dset)
+})
+
+```
+
+```{r}
+library(viridis)
+p1 <- dep_cor_res %>% filter(dset == 'D1_Ach') %>% 
+    ggplot(aes(a, cor)) + 
+    stat_binhex(aes(fill=log(10 + ..count..))) + 
+    geom_smooth(color = 'red', se = F) + 
+    scale_fill_viridis() +
+    xlab('Cell line avg. dependency score') +
+    ylab('Dep-dep correlation') +
+    ggtitle('D1') +
+    theme_Publication(base_font) +
+    guides(fill = guide_colorbar(title = 'Log density', ticks = FALSE, label = FALSE))
+
+p2 <- dep_cor_res %>% filter(dset == 'D2_Ach') %>% 
+    ggplot(aes(a, cor)) + 
+    stat_binhex(aes(fill=log(10 + ..count..))) + 
+    geom_smooth(color = 'red', se = F) + 
+    scale_fill_viridis() +
+    xlab('Cell line avg. dependency score') +
+    ylab('Dep-dep correlation') +
+    ggtitle('D2') +
+    theme_Publication(base_font) +
+    guides(fill = guide_colorbar(title = 'Log density', ticks = FALSE, label = FALSE))
+
+# p1 <- plot_colorByDensity(dep_cor_res %>% filter(dset == 'D1_Ach'), 'a', 'cor', size = 1) +
+#     geom_hline(yintercept = 0, linetype = 'dashed') +
+#     geom_smooth(color = 'red') +
+#     xlab('Pop. avg dependency score') +
+#     ylab('Pairwise Correlation') +
+#     ggtitle('D1') +
+#     theme_Publication(base_font) 
+# 
+# p2 <- plot_colorByDensity(dep_cor_res %>% filter(dset == 'D2_Ach'), 'a', 'cor', size = 1) +
+#     geom_hline(yintercept = 0, linetype = 'dashed') +
+#     geom_smooth(color = 'red') +
+#     xlab('Pop. avg dependency score') +
+#     ylab('Pairwise Correlation') +
+#     ggtitle('D2') +
+#     theme_Publication(base_font)
+
+p <- plot_grid(p1, p2, nrow = 1)
+ggsave(file.path(fig_dir, 'avg_depcor.png'), plot = p, width = 8, height = 3.5, dpi = 350)
+print(p)
+```
+
+
+```{r}
+p1 <- ggplot(dep_cor_res %>% 
+           filter(grepl('Ach', dset)) %>% 
+           mutate(model = str_match(dset, '([:alnum:]+)_')[,2]), 
+       aes(a, cor, color = model)) + 
+    geom_smooth() +
+    xlab('Cell line avg dependency score') +
+    ylab('Average dep-dep correlation') + 
+    scale_colour_manual(values = mod_type_pal) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.75)) +
+    theme_Publication(base_font) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    ggtitle('Achilles')
+
+p2 <- ggplot(dep_cor_res %>% 
+           filter(grepl('DRIVE', dset)) %>% 
+           mutate(model = str_match(dset, '([:alnum:]+)_')[,2]), 
+       aes(a, cor, color = model)) + 
+    geom_smooth() +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.75)) +
+    xlab('Cell line avg dependency score') +
+    ylab('Average dep-dep correlation') + 
+    scale_colour_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    ggtitle('DRIVE')
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+ggsave(file.path(fig_dir, 'avg_depcor_all_smoothed.png'), plot = p, width = 8, height = 3.5, dpi = 350)
+
+```
+
+
+
+
+# Figure 3: D2 improves estimates of dependency profiles
+
+```{r, include = FALSE}
+use_common_genes <- FALSE
+if (use_common_genes) {
+    target_mat <- dep_data$CERES_CRISPR$gene_scores[, common_dep_genes]
+} else {
+    target_mat <- dep_data$CERES_CRISPR$gene_scores
+}
+CRISPR_cors <- get_mat_dep_cors(setdiff(names(dep_datasets), 'CERES_CRISPR'), target_mat, use_bayes)
+CRISPR_cors %<>% 
+    left_join(gene_avgs %>% 
+               filter(dset == 'D2_Ach') %>% 
+               dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+                   by = "Gene") %>% 
+    left_join(gene_avgs %>% 
+               filter(dset == 'D2_DRIVE') %>% 
+               dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+                   by = "Gene")
+CRISPR_cors %<>% left_join(gene_SDs %>% 
+                               filter(dset == 'D2_Ach') %>% 
+                               dplyr::select(Gene, SD_essentiality_Ach = SD_score), 
+                   by = "Gene")
+```
+
+
+## 3a: D2 improves agreement with CRISPR-based dependency profiles for Achilles data
+
+Correlation between RNAi and CRISPR dependency profiles for each gene are compared when using D1 and D2. D2-based estimates give small but systematic improvements in the agreement with CRISPR.
+
+```{r, fig.width=5, fig.height=4}
+df <- CRISPR_cors %>% 
+    spread(dset, cor)
+ggplot(df, aes(D1_Ach, D2_Ach)) + 
+    geom_point(data = df %>% filter(gene_type == 'other'), color = 'black', alpha = 0.5, cex = 0.5) +
+    geom_point(data = df %>% filter(gene_type != 'other'), aes(fill = gene_type), shape = 21, color = 'white', stroke = 0.5, alpha = 0.75, size = 1) +
+    xlab('RNAi-CRISPR corr (D1)') +
+    ylab('RNAi-CRISPR corr (D2)') +
+    geom_abline(color = 'magenta', lwd = 0.75, linetype = 'dashed') +
+    guides(fill = guide_legend(title = 'Gene type')) +
+    # scale_fill_Publication() + 
+    scale_fill_manual(values = gene_type_pal) +
+    theme_Publication(base_font)
+
+ggsave(file.path(fig_dir, 'CRISPR_cor_scatter.png'), width = 4, height = 3.5, dpi = 350)
+```
+
+## 3b: Improved agreement with CRISPR across datasets
+
+Average correlation of gene dependency profiles with CRISPR data is plotted as a function of the average essentiality (based on D2 RNAi data) of the gene. D2 improves agreement with CRISPR for both Achilles and DRIVE datasets, with the largest improvements for more essential genes.
+
+```{r, fig.width=9, fig.height=5}
+p1 <- ggplot(CRISPR_cors %>% filter(grepl('Ach', dset)) %>% 
+           mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+                  model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_Ach, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. CRISPR-RNAi\ndependency corr.') +
+    xlab('Cell line avg. dependency score') +
+    coord_cartesian(ylim = c(0., 0.3), xlim = c(-1.5, 0.5)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # scale_colour_Publication() + 
+    scale_color_manual(values = mod_type_pal) +
+    scale_x_continuous(breaks = c(-1, 0)) +
+    # ggtitle('Achilles') +
+    theme_Publication(base_font)
+
+p2 <- ggplot(CRISPR_cors %>% filter(grepl('DRIVE', dset)) %>% 
+              mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+                     model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_DRIVE, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. CRISPR-RNAi\ndependency corr.') +
+    xlab('Cell line avg. dependency score') +
+    coord_cartesian(ylim = c(0., 0.375), xlim = c(-1.5, 0.5)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # scale_colour_Publication() + 
+    # ggtitle('DRIVE') +
+    scale_color_manual(values = mod_type_pal) +
+    scale_x_continuous(breaks = c(-1, 0)) +
+    theme_Publication(base_font)
+    
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="none"),
+                         p2 + ggtitle('DRIVE') + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'CRISPR_cor_smooth.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+```{r, include = FALSE}
+if (use_common_genes) {
+    target_mat <- feature_data$GE[, intersect(common_dep_genes, colnames(feature_data$GE))]
+} else {
+    target_mat <- feature_data$GE
+}
+
+GE_cors <- get_mat_dep_cors(names(dep_datasets), target_mat, use_bayes)
+GE_cors %<>% left_join(gene_avgs %>% 
+                   filter(dset == 'D2_Ach') %>% 
+                   dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+                           by = "Gene") %>% 
+     left_join(gene_avgs %>% 
+                   filter(dset == 'D2_DRIVE') %>% 
+                   dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+                           by = "Gene")
+```
+
+## 3c: D2 improves correlations between dependencies and the gene's own expression
+
+D2 based essentiality estimates showed greater average correlation with the gene's own expression levels compared with other methods, for both the Achilles and DRIVE datasets. 
+
+```{r, fig.width=9, fig.height=5}
+p1 <- ggplot(GE_cors %>% filter(grepl('Ach', dset)) %>% 
+         mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+                model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_Ach, abs(cor), color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. dep-GE\ncorrelation magnitude') +
+    xlab('Cell line avg. dependency score') +
+    # ggtitle("Achilles") +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.325)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # scale_colour_Publication() +
+    scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font)
+
+p2 <- ggplot(GE_cors %>% filter(grepl('DRIVE', dset)) %>% 
+         mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+                model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_DRIVE, abs(cor), color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. dep-GE\ncorrelation magnitude') +
+    xlab('Cell line avg. dependency score') +
+    # ggtitle('DRIVE') +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.325)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # scale_colour_Publication() +
+    scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font)
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="none"),
+                         p2 + ggtitle('DRIVE') + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'GE_cor_smooth.png'), plot = p, width = 6, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'GE_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'GE_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+
+```{r, include = FALSE}
+if (use_common_genes) {
+    target_mat <- feature_data$CN[, intersect(common_dep_genes, colnames(feature_data$CN))]
+} else {
+    target_mat <- feature_data$CN
+}
+
+CN_cors <- get_mat_dep_cors(names(dep_datasets), target_mat, use_bayes)
+CN_cors %<>% left_join(gene_avgs %>% 
+                               filter(dset == 'D2_Ach') %>% 
+                               dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+                           by = "Gene") %>% 
+    left_join(gene_avgs %>% 
+                               filter(dset == 'D2_DRIVE') %>% 
+                               dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+                           by = "Gene")
+```
+
+## 3d: D2 improves correlations between dependencies and the gene's own copy number
+
+Same as above, but using the gene's own relative copy number
+
+```{r, fig.width=9, fig.height=5}
+p1 <- ggplot(CN_cors %>% filter(grepl('Ach', dset)) %>%  
+         mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+                model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_Ach, abs(cor), color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg dep-CN\ncorrelation magnitude') +
+    xlab('Cell line avg. dependency score') +
+    # ggtitle('Achilles') +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.45)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # ggtitle('Achilles') +
+    scale_color_manual(values = mod_type_pal) +
+    scale_x_continuous(breaks = c(-1, 0)) +
+    # scale_colour_Publication() +
+    theme_Publication(base_font)
+
+p2 <- ggplot(CN_cors %>% filter(grepl('DRIVE', dset)) %>% 
+        mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
+               model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(avg_essentiality_DRIVE, abs(cor), color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. dep-CN\ncorrelation magnitude') +
+    xlab('Cell line avg. dependency score') +
+    # ggtitle('DRIVE') +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.45)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    # ggtitle('DRIVE') +
+    scale_color_manual(values = mod_type_pal) +
+    scale_x_continuous(breaks = c(-1, 0)) +
+    # scale_colour_Publication() +
+    theme_Publication(base_font)
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="none"),
+                         p2 + ggtitle('DRIVE') + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'CN_cor_smooth.png'), plot = p, width = 6, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CN_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CN_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+## Cyclops example
+
+```{r}
+examp_CYCLOPS <- '6167' #RPL37
+to_plot <- Ach_CL_data %>% left_join(
+    data.frame(D1 = dep_data$D1_Ach$gene_scores[, examp_CYCLOPS],
+               CCLE_ID = rownames(dep_data$D1_Ach$gene_scores))) %>% 
+    left_join(
+    data.frame(D2 = dep_data$D2_Ach$gene_scores[, examp_CYCLOPS],
+               CCLE_ID = rownames(dep_data$D2_Ach$gene_scores))) %>% 
+    left_join(
+        data.frame(CN = feature_data$CN[, examp_CYCLOPS],
+                   CCLE_ID = rownames(feature_data$CN))
+    ) %>% 
+    dplyr::rename(`Screen signal` = gene_slope)
+
+g1 <- ggplot(to_plot, aes(CN, D1, fill = `Screen signal`)) + 
+    geom_point(shape = 21, color = 'black', size = 2, stroke = 0.25, alpha = 0.8) + 
+    # geom_smooth(method = 'lm', color = 'black') +
+    scale_fill_gradient2(midpoint = 1, limits = c(0.5, 2), oob = squish, breaks = c(0.5, 2)) +
+    # guides(color = guide_legend(title = 'Screen signal')) +
+    xlab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' relative CN (log2)')) +
+    ylab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' dependency (D1)'))+
+        theme_Publication(base_font) +
+    theme(legend.key.size= unit(0.5, "cm")) 
+    # ggtitle(sprintf('CN-Dep cor: %s\nSS-Dep cor: %s', 
+    #                 format(cor(to_plot$CN, to_plot$D1, use = 'pairwise.complete.obs'), digits = 3),
+    #                  format(cor(to_plot$`Screen signal`, to_plot$D1, use = 'pairwise.complete.obs'), digits = 3))) 
+
+with(to_plot, cor.test(`Screen signal`, D1, use = 'pairwise.complete.obs'))
+with(to_plot, cor.test(CN, D1, use = 'pairwise.complete.obs'))
+
+
+g2 <- ggplot(to_plot, aes(CN, D2, fill = `Screen signal`)) + 
+    geom_point(shape = 21, color = 'black', size = 2, stroke = 0.25, alpha = 0.8) + 
+    # geom_smooth(method = 'lm', color = 'black') +
+    # guides(color = guide_legend(title = 'Screen signal')) +
+   scale_fill_gradient2(midpoint = 1, limits = c(0.5, 2), oob = squish) +
+    xlab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' relative CN (log2)')) +
+    ylab(paste0(Gene_ID_to_symb[examp_CYCLOPS], ' dependency (D2)')) +
+    theme_Publication(base_font) 
+    # ggtitle(sprintf('CN-Dep cor: %s\nCN-SS cor: %s', 
+    #                 format(cor(to_plot$CN, to_plot$D2, use = 'pairwise.complete.obs'), digits = 3),
+    #                 format(cor(to_plot$`Screen signal`, to_plot$D2, use = 'pairwise.complete.obs'), digits = 3)))
+    
+with(to_plot, cor.test(`Screen signal`, D2, use = 'pairwise.complete.obs'))
+with(to_plot, cor.test(CN, D2, use = 'pairwise.complete.obs'))
+
+mylegend<-g_legend(g1)
+
+p <- grid.arrange(arrangeGrob(g1 + theme(legend.position="none"),
+                         g2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 2))
+ggsave(file.path(fig_dir, 'cyclops_example.png'), plot = p, width = 7, height = 4., dpi = 350)
+
+```
+
+
+```{r}
+target_dsets <- names(dep_datasets)
+cur_gene_set <- NULL
+cur_CL_set <- NULL
+bench_res <- get_target_biomarker_dep_cors(target_dsets,
+                                           CRISPR_benchmarks,
+                                           feature_data,
+                                           cur_gene_set,
+                                           cur_CL_set)
+
+# bench_res <- get_target_biomarker_dep_cors(target_dsets, curated_benchmarks, feature_data, cur_gene_set, cur_CL_set)
+
+bench_cors <- bench_res %>% 
+    dplyr::select(-p.value) %>% 
+    spread(model, cor)
+
+bench_p <- bench_res %>% 
+    dplyr::select(-cor) %>% 
+    spread(model, p.value)
+```
+
+```{r}
+with(bench_cors, wilcox.test(abs(D2_Ach), abs(D1_Ach), paired = TRUE))
+with(bench_cors, sum(!is.na(D2_Ach) & !is.na(D1_Ach)))
+with(bench_cors, median(abs(D2_Ach) - abs(D1_Ach)/abs(D1_Ach), na.rm=TRUE))
+
+with(bench_cors, wilcox.test(abs(D2_DRIVE), abs(D1_DRIVE), paired = TRUE))
+with(bench_cors, sum(!is.na(D2_DRIVE) & !is.na(D1_DRIVE)))
+
+```
+
+
+## 3e: D2 improves dependency-biomarker correlations for benchmark set
+
+Using top benchmark-dependency relationships identified using the CRISPR dataset, D2 based essentiality estimates give improved agreement with expected biomarkers compared with D1.
+
+```{r, fig.width=5, fig.height=4.5}
+if (fig_dir == '~/CPDS/demeter2/results/post_figures') {
+    n_label <-  6
+    label_size <- 3
+} else {
+     n_label <-  15
+    label_size <- 2
+}
+p1 <- ggplot(bench_cors, aes(D1_Ach, D2_Ach, color = feat_type)) + 
+        geom_point(alpha = 0.5, size = 0.75) + 
+        geom_abline(linetype = 'dashed') +
+        geom_text_repel(data = bench_cors %>% 
+                            arrange(desc(abs(D2_Ach))) %>% 
+                            head(n_label),
+                        aes(label = Dep_gene), size = label_size) +
+    xlab('Feature-dep corr (D1)') +
+    ylab('Feature-dep corr (D2)') +
+    guides(color = guide_legend(title = 'Feature type')) +
+    # ggtitle('Achilles') +
+    scale_colour_Publication() +
+    theme_Publication(base_font)
+
+p2 <- ggplot(bench_cors, aes(D1_DRIVE, D2_DRIVE, color = feat_type)) + 
+        geom_point(alpha = 0.5, size = 0.75) + 
+        geom_abline(linetype = 'dashed') +
+        geom_text_repel(data = bench_cors %>% 
+                            arrange(desc(abs(D2_DRIVE))) %>% 
+                            head(n_label),
+                        aes(label = Dep_gene), size = label_size) +
+    xlab('Feature-dep corr (D1)') +
+    ylab('Feature-dep corr (D2)') +
+    guides(color = guide_legend(title = 'Feature type')) +
+    # ggtitle('DRIVE') +
+    scale_colour_Publication() +
+    theme_Publication(base_font)
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="none"),
+                         p2 + ggtitle('DRIVE') + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'bench_cor_scatter.png'), plot = p, width = 6, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_cor_scatter_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_cor_scatter_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+## 3f: Improved dep-biomarker correlations across datasets
+
+Improved agreement with expected biomarkers using D2 for both Achilles and DRIVE
+
+```{r, fig.width=9, fig.height=5}
+df <- bench_cors[, names(dep_datasets)] %>% melt()
+
+p1 <- ggplot(df %>% filter(grepl('Ach', variable)) %>% 
+           mutate(model = str_match(variable, '([:alnum:]+)_')[,2],
+                  model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(abs(value), color = model)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlab('Feature-dep. corr. magnitude') +
+    ylab('CDF') +
+    # ggtitle('Achilles') +
+    xlim(0.6, 0) +
+    ylim(0, 0.5) +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    scale_color_manual(values = mod_type_pal) +
+    geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') + 
+    # scale_colour_Publication() +
+    theme_Publication(base_font)
+
+p2 <- ggplot(df %>% filter(grepl('DRIVE', variable)) %>% 
+           mutate(model = str_match(variable, '([:alnum:]+)_')[,2],
+                  model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+       aes(abs(value), color = model)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlab('Feature-dep. corr. magnitude') +
+    ylab('CDF') +
+    # ggtitle('DRIVE') +
+    xlim(0.6, 0) +
+    ylim(0, 0.5) +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') + 
+    scale_color_manual(values = mod_type_pal) +
+    # scale_colour_Publication() +
+    theme_Publication(base_font)
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="none"),
+                         p2 + ggtitle('DRIVE') + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'bench_ecdf.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_ecdf_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_ecdf_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+```{r}
+df <- bench_cors[, names(dep_datasets)] %>% melt()
+df %<>% 
+    filter(grepl('DRIVE', variable) | grepl('Ach', variable)) %>% 
+    group_by(variable) %>% 
+    summarise(n_strong = sum(abs(value) > bench_cor_thresh, na.rm=T),
+    # summarise(n_strong = sum(value < 1e-3, na.rm=T),
+              n_tot = sum(!is.na(value))) %>% 
+    mutate(frac_strong = n_strong / n_tot,
+           dset = ifelse(grepl('DRIVE', variable), 'DRIVE', 'Ach'),
+           model = str_match(variable, '([:alnum:]+)_')[,2],
+           model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA')))
+ymax <- max(df$frac_strong*100, na.rm=T)
+p1 <- ggplot(df %>% filter(dset == 'Ach'), 
+       aes(model, frac_strong*100, fill = model)) +
+    geom_bar(stat = 'identity') +
+    scale_fill_manual(values = mod_type_pal) +
+    ylab('Percent strong\nfeature-dep correlation') +
+    theme_Publication() +
+    # ylim(0,ymax) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    guides(fill = guide_legend(title = element_blank()))
+
+p2 <- ggplot(df %>% filter(dset == 'DRIVE'), 
+       aes(model, frac_strong*100, fill = model)) +
+    geom_bar(stat = 'identity') +
+    scale_fill_manual(values = mod_type_pal) +
+    ylab('Percent strong\nfeature-dep correlation') +
+    theme_Publication() +    
+        # ylim(0,ymax) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) +
+    guides(fill = guide_legend(title = element_blank()))
+
+p <- arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1)
+ggsave(file.path(fig_dir, 'bench_strong_cors_bar.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_strong_cors_bar_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_strong_cors_bar_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+
+```
+
+
+# Figure 4: Accounting for uncertainty improves downstream analyses
+
+Possibly supplemental figure?
+
+##4a: Uncertainty estimates capture cell line quality differences
+
+Average gene-score uncertainty per CL is closely related to the differences in CL pos-neg control SSMD (using GA)
+
+```{r, fig.width=5, fig.height=4}
+avg_unc <- data.frame(
+    CCLE_ID = rownames(dep_data$D2_Ach$gene_scores),
+    avg_sd = sqrt(rowMeans(dep_data$D2_Ach$gene_score_SDs^2, na.rm=T))
+) %>% left_join(Ach_CL_data, by = "CCLE_ID")
+unc_df <- per_CL_stats %>% 
+    filter(dset == 'GA_Ach') %>% 
+    inner_join(avg_unc, by = 'CCLE_ID') %>% 
+    left_join(read.csv('~/CPDS/demeter2/results/Ach_rep_cors.csv', stringsAsFactors = F, check.names = F), by = "CCLE_ID")
+
+ggplot(unc_df, aes(ssmd, avg_sd)) + 
+    geom_point(alpha = 0.75, shape = 21, size = 2, stroke = 0.5, fill = 'black', color = 'white') +
+    ylab('Average dependency score\nuncertainty (SD)') +
+    xlab('Cell line screen quality\n(GA model SSMD)') +
+    theme_Publication(base_font)
+
+ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+```
+
+```{r}
+ggplot(unc_df, aes(rep_cor, avg_sd)) + 
+    geom_point(alpha = 0.75, shape = 21, size = 2, stroke = 0.5, fill = 'black', color = 'white') +
+    ylab('Average dependency score\nuncertainty (SD)') +
+    xlab('Avg. replicate correlation') +
+    theme_Publication(base_font)
+
+ggsave(file.path(fig_dir, 'repcor_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+
+```
+
+
+## 4b: Uncertainty estimates reflect number of good hairpins per gene
+
+Average uncertainty of essentiality estimates for each gene are compared with the sum of estimated gene knockdown efficacies across the hairpins targeting the gene.
+
+```{r, fig.width=5, fig.height=4}
+gene_avg_unc <- colMeans(dep_data$D2_Ach$gene_score_SDs^2, na.rm=T)
+
+sum_Geff <- avg_Geffs %>% 
+    filter(dset == 'D2_Ach') %>% 
+    left_join(data.frame(Gene_ID = colnames(dep_data$D2_Ach$gene_score_SDs), gene_avg_SD = sqrt(gene_avg_unc)), by = 'Gene_ID')
+
+plot_colorByDensity(sum_Geff, 'sum_Geff', 'gene_avg_SD') +
+    xlab('Total shRNA efficacy') +
+    ylab('Average dependency score\nuncertainty (SD)') +
+    theme_Publication(base_font)
+
+ggsave(file.path(fig_dir, 'hpEff_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+```
+
+
+## 4c: Accounting for variable uncertainty improves agreement with CRISPR
+
+Correlation between RNAi and CRISPR dependency profiles is improved when using precision-weighted correlation estimates that account for gene-score uncertainties
+
+```{r, fig.width=9, fig.height=5}
+use_common_genes <- FALSE
+if (use_common_genes) {
+    target_mat <- dep_data$CERES_CRISPR$gene_scores[, common_dep_genes]
+} else {
+    target_mat <- dep_data$CERES_CRISPR$gene_scores
+}
+CRISPR_cors_noUnc <- get_mat_dep_cors(c('D2_Ach', 'D2_DRIVE'), target_mat, use_bayes=F)
+new_dsets <- c(D2_Ach = 'D2noUnc_Ach', D2_DRIVE = 'D2noUnc_DRIVE')
+CRISPR_cors_noUnc %<>% mutate(dset = new_dsets[dset])
+CRISPR_cors_with_unc <- CRISPR_cors %>%  
+    dplyr::select(-avg_essentiality_Ach, -avg_essentiality_DRIVE, -SD_essentiality_Ach) %>% 
+    rbind(CRISPR_cors_noUnc)
+
+CRISPR_cors_with_unc %<>% left_join(gene_avgs %>% 
+                               filter(dset == 'D2_Ach') %>% 
+                               dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+                           by = "Gene") %>% 
+                        left_join(gene_avgs %>% 
+                               filter(dset == 'D2_DRIVE') %>% 
+                               dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+                           by = "Gene")
+
+p1 <- ggplot(CRISPR_cors_with_unc %>% filter(grepl('Ach', dset)) %>% 
+            mutate(model = str_match(dset, '([:alnum:]+)_')[,2]) %>% 
+       filter(grepl('D2', model) | grepl('D1', model) | grepl('GA', model)),
+       aes(avg_essentiality_Ach, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.025, 0.375)) +
+    ylab('Avg. RNAi-CRISPR\ndependency corr') +
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    ggtitle('Achilles') +
+    # scale_colour_Publication() +
+    scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font)
+
+p2 <- ggplot(CRISPR_cors_with_unc %>% filter(grepl('DRIVE', dset)) %>% 
+       mutate(model = str_match(dset, '([:alnum:]+)_')[,2]) %>% 
+       filter(grepl('D2', model) | grepl('D1', model) | grepl('GA', model)),
+       aes(avg_essentiality_DRIVE, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('Avg. RNAi-CRISPR\ndependency corr') +
+    xlab('Cell line avg. dependency score') +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.025, 0.375)) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    ggtitle('DRIVE') +
+    scale_color_manual(values = mod_type_pal) +
+    # scale_colour_Publication() +
+    theme_Publication(base_font)
+ 
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'CRISPR_cors_unc_smooth.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+
+```
+
+
+# Figure 5: D2 allows for efficient integration across datasets
+
+## 5a: Overlap of data across Achilles, DRIVE, and Marcotte datasets
+
+### Overlap of CLs
+
+```{r}
+library(VennDiagram)
+
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
+
+CL_list <- list(Achilles = rownames(dep_data$D2_Ach$gene_scores),
+                DRIVE = rownames(dep_data$D2_DRIVE$gene_scores),
+                Marcotte = rownames(dep_data$D2_Marc$gene_scores))
+venn.diagram(CL_list , NULL, 
+                          filename = file.path(fig_dir, 'CL_venn_diagram.tiff'),
+                          width = 4, height = 4,
+                          resolution = 150,
+                          imagetype = 'tiff',
+                          fill=c("darkorange", 'darkgreen', "darkblue"), 
+                          alpha=c(0.5,0.5, 0.5), cex = 2, 
+                          cat.fontface=2,
+                          cat.cex = 2,
+                        margin = 0.1,
+                          category.names=names(CL_list))
+
+venn.diagram(CL_list , NULL, 
+                          filename = file.path(fig_dir, 'CL_venn_diagram.svg'),
+                          width = 4, height = 4,
+                          # resolution = 150,
+                          imagetype = 'svg',
+                          fill=c("darkorange", 'darkgreen', "darkblue"), 
+                          alpha=c(0.5,0.5, 0.5), cex = 2, 
+                          cat.fontface=2,
+                          cat.cex = 2,
+                        margin = 0.1,
+                          category.names=names(CL_list))
+
+grid.newpage()
+venn.plot <- venn.diagram(CL_list , NULL, 
+                          fill=c("darkorange", 'darkgreen', "darkblue"), 
+                          resolution = 150,
+                          imagetype = 'tiff',
+                          alpha=c(0.5,0.5, 0.5), cex = 2, 
+                          cat.fontface=2, 
+                          cat.cex = 2,
+                        margin = 0.1,
+                          category.names=names(CL_list))
+grid.draw(venn.plot)
+
+```
+
+### Overlap of genes
+
+(only those used in the model)
+
+```{r}
+gene_list <- list(Achilles = colnames(dep_data$D2_Ach$gene_scores),
+                DRIVE = colnames(dep_data$D2_DRIVE$gene_scores),
+                Marcotte = colnames(dep_data$D2_Marc$gene_scores))
+
+venn.plot <- venn.diagram(gene_list , NULL, 
+                           filename = file.path(fig_dir, 'gene_venn_diagram.tiff'),
+                          width = 4, height = 4,
+                          resolution = 150,
+                          imagetype = 'tiff',
+                          fill=c("darkorange", 'darkgreen', "darkblue"), 
+                          alpha=c(0.5,0.5, 0.5), cex = 2, 
+                          cat.fontface=2, 
+                          category.names=names(CL_list), 
+                          margin = 0.1,
+                          cat.cex = 2)
+
+
+grid.newpage()
+venn.plot <- venn.diagram(gene_list , NULL, 
+                          fill=c("darkorange", 'darkgreen', "darkblue"), 
+                          alpha=c(0.5,0.5, 0.5), cex = 1.5, 
+                          cat.fontface=8, 
+                          category.names=names(CL_list), 
+                          main="Genes overlap")
+grid.draw(venn.plot)
+
+```
+
+
+
+```{r, include = FALSE}
+#Compute SSMD of pos-neg controls for each dataset
+only_overlapping_genes <- TRUE
+ov_gene_sep_stats <- get_gene_avg_stats(dep_data, gene_avgs, names(dep_datasets), only_overlapping_genes, use_bayes = use_bayes)
+
+```
+
+## 5b: D2 combines datasets with minimal batch effects
+
+PCA on the gene-dependency data clearly identifies the different batches for data that is simply 'merged together', but batch effects are not apparent in PCA space for the combined D2 data.
+
+```{r, fig.width=10, fig.height = 4}
+Ach_CLs <- rownames(dep_data$D2_Ach$gene_scores)
+DRIVE_CLs <- rownames(dep_data$D2_DRIVE$gene_scores)
+Marc_CLs <- rownames(dep_data$D2_Marc$gene_scores)
+Marc_CLs[!grepl('BREAST', Marc_CLs)] <- paste0(Marc_CLs[!grepl('BREAST', Marc_CLs)], '_BREAST')
+
+library(pcaMethods)
+center <- TRUE
+D2_pcs <- pcaMethods::pca(dep_data$D2_comb$gene_scores,
+                          method = 'ppca',
+                          nPCs = 2,
+                          scale = 'none',
+                          center = center)
+D2_R2sum <- R2cum(D2_pcs)
+D2_pcs <- scores(D2_pcs)
+
+GA_pcs <- pcaMethods::pca(dep_data$GA_comb$gene_scores,
+                          method = 'ppca',
+                          nPCs = 2,
+                          scale = 'none',
+                          center = center)
+GA_R2sum <- R2cum(GA_pcs)
+GA_pcs <- scores(GA_pcs)
+
+# dep_data$D1_merge$gene_scores[is.na(dep_data$D1_merge$gene_scores)] <- NA
+D1_pcs <- pcaMethods::pca(dep_data$D1_merge$gene_scores,
+                          method = 'ppca',
+                          nPCs = 2,
+                          scale = 'none',
+                          center = center)
+D1_R2sum <- R2cum(D1_pcs)
+D1_pcs <- scores(D1_pcs)
+
+
+a_df <- data.frame(CCLE_ID = rownames(dep_data$D2_comb$gene_scores), 
+                   D2_PC1 = D2_pcs[,1], 
+                   D2_PC2 = D2_pcs[,2]
+                   ) %>% 
+    left_join(data.frame(
+      CCLE_ID = rownames(dep_data$GA_comb$gene_scores), 
+                   GA_PC1 = GA_pcs[,1], 
+                   GA_PC2 = GA_pcs[,2]  
+    ), by = 'CCLE_ID') %>% 
+    left_join(data.frame(
+      CCLE_ID = rownames(dep_data$D1_merge$gene_scores), 
+                   D1_PC1 = D1_pcs[,1], 
+                   D1_PC2 = D1_pcs[,2]  
+    ), by = 'CCLE_ID') 
+# a_df %<>% left_join(CL_ann, by ='CCLE_ID')
+
+Ach_batch_info <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
+    mutate(CL_batch = paste0('Ach_batch', CL_batch))
+Ach_batch <- Ach_batch_info$CL_batch %>% set_names(Ach_batch_info$CCLE_ID)
+
+#define the two main Achilles batches
+Ach_batch[Ach_batch == 'Ach_batch2'] <- 'Ach_batch1'
+Ach_batch <- c(Ach_batch0 = 'Achilles98k', Ach_batch1 = 'Achilles55k')[Ach_batch]
+Ach_batch %<>% set_names(Ach_batch_info$CCLE_ID)
+
+get_cl_memb <- function(x) {
+    m <- rep(NA, length(x))
+    m[x %in% Ach_CLs] <- Ach_batch[x[x %in% Ach_CLs]]
+    m[x %in% DRIVE_CLs] <- 'DRIVE_only'
+    m[x %in% Marc_CLs] <- 'Marc_only'
+    m[(x %in% Ach_CLs) & (x %in% DRIVE_CLs)] <- 'Ach+DRIVE'
+    m[(x %in% Ach_CLs) & (x %in% Marc_CLs)] <- 'Ach+Marc'
+    m[(x %in% DRIVE_CLs) & (x %in% Marc_CLs)] <- 'DRIVE+Marc'
+    m[(x %in% Ach_CLs) & (x %in% Marc_CLs) & (x %in% DRIVE_CLs)] <- 'Ach+DRIVE+Marc'
+    return(m)
+}
+a_df %<>% mutate(CL_m = get_cl_memb(CCLE_ID))
+
+cmap <- c(Achilles98k = 'lightblue',
+          Achilles55k = 'darkblue',
+          `Ach+DRIVE` = 'purple',
+          DRIVE_only = 'red',
+          `DRIVE+Marc` = 'darkorange',
+          `Ach+DRIVE+Marc`='brown',
+          Marc_only = 'gold',
+          `Ach+Marc` = 'darkgreen')
+
+p1 <- ggplot(a_df, aes(D2_PC1, D2_PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch')) +
+    xlab('PC1') + ylab('PC2') +
+    ggtitle('D2-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+
+p2 <- ggplot(a_df, aes(GA_PC1, GA_PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch')) +
+    xlab('PC1') + ylab('PC2') +
+    ggtitle('GA-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+
+p3 <- ggplot(a_df, aes(D1_PC1, D1_PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch')) +
+    xlab('PC1') + ylab('PC2') +
+    ggtitle('D1-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+
+# mylegend<-g_legend(p1)
+
+p <- arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         p3 + theme(legend.position='none'),
+                         nrow=1)
+# p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+#                          p2 + theme(legend.position="none"),
+#                          p3 + theme(legend.position='none'),
+#                          nrow=1),
+#              mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 9.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 9.5, height = 3.5, device = cairo_pdf())
+
+#QUANTIFY structure in PCs related to batch
+a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
+                 in_DRIVE = CCLE_ID %in% rownames(dep_data$D2_DRIVE$gene_scores),
+                 in_Marc = CCLE_ID %in% rownames(dep_data$D2_Marc$gene_scores))
+
+GA_PC1_sum <- summary(lm(GA_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+GA_PC2_sum <- summary(lm(GA_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D1_PC1_sum <- summary(lm(D1_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D1_PC2_sum <- summary(lm(D1_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D2_PC1_sum <- summary(lm(D2_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D2_PC2_sum <- summary(lm(D2_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+lm_sum <- c(GA_PC1 = GA_PC1_sum$r.squared,
+            GA_PC2 = GA_PC2_sum$r.squared,
+            D1_PC1 = D1_PC1_sum$r.squared,
+            D1_PC2 = D1_PC2_sum$r.squared,
+            D2_PC1 = D2_PC1_sum$r.squared,
+            D2_PC2 = D2_PC2_sum$r.squared)
+lm_sum <- data.frame(type = names(lm_sum), r_squared = lm_sum) 
+
+GA_PC1_sum <- summary(lm(abs(GA_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+GA_PC2_sum <- summary(lm(abs(GA_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D1_PC1_sum <- summary(lm(abs(D1_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D1_PC2_sum <- summary(lm(abs(D1_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D2_PC1_sum <- summary(lm(abs(D2_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+D2_PC2_sum <- summary(lm(abs(D2_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+lm_abs_sum <- c(GA_PC1_mag = GA_PC1_sum$r.squared,
+            GA_PC2_mag = GA_PC2_sum$r.squared,
+            D1_PC1_mag = D1_PC1_sum$r.squared,
+            D1_PC2_mag = D1_PC2_sum$r.squared,
+            D2_PC1_mag = D2_PC1_sum$r.squared,
+            D2_PC2_mag = D2_PC2_sum$r.squared)
+lm_abs_sum <- data.frame(type = names(lm_abs_sum), r_squared = lm_abs_sum) 
+
+lm_tot <- rbind(lm_sum, lm_abs_sum) %>% 
+    mutate(dset = str_match(type, '([:alnum:]+)_')[,2],
+           name = str_match(type, '(.+_PC[12])')[,2],
+           abs = grepl('mag', type),
+           type = as.vector(type),
+           abs = ifelse(abs, 'PC Magnitude', 'PC'))
+ggplot(lm_tot, aes(x=name, y=r_squared, group = dset, fill = dset)) +
+    geom_bar(stat='identity') +
+    ylab('Batch R2') +
+    xlab('') +
+    facet_wrap(~abs, ncol=1) + 
+    theme_Publication() +
+    scale_fill_manual(values = mod_type_pal) +
+    theme(axis.text.x=element_text(angle=90, hjust=1)) 
+
+ggsave(file.path(fig_dir, 'PCA_R2.png'), width = 4, height = 5, dpi = 350)
+
+```
+
+
+
+```{r, include = FALSE}
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'CERES_CRISPR')
+
+cur_gene_set <- Reduce(intersect, llply(dep_data[target_dsets], function(d) {colnames(d$gene_scores)}))
+RNAi_common_genes <- Reduce(intersect, llply(dep_data[setdiff(target_dsets, 'CERES_CRISPR')], function(d) {colnames(d$gene_scores)}))
+RNAi_common_CLs <- Reduce(intersect, llply(dep_data[setdiff(target_dsets, 'CERES_CRISPR')], function(d) {rownames(d$gene_scores)}))
+
+gene_avgs <- ldply(target_dsets, function(cur_dset) {
+    if (cur_dset == 'CERES_CRISPR') {
+            cur_gene_avgs <- colMeans(dep_data[[cur_dset]]$gene_scores[, cur_gene_set], na.rm=T)
+    } else {
+      if (dep_datasets[[cur_dset]]$mod_type == 'D2' & use_bayes) {
+              cur_gene_avgs <- sapply(cur_gene_set, function(cur_gene) {
+                  wtd.mean(dep_data[[cur_dset]]$gene_scores[RNAi_common_CLs, cur_gene],
+                           1/dep_data[[cur_dset]]$gene_score_SDs[RNAi_common_CLs, cur_gene]^2)
+              })
+        } else {
+            cur_gene_avgs <- colMeans(dep_data[[cur_dset]]$gene_scores[RNAi_common_CLs, cur_gene_set], na.rm=T)
+        }
+   }
+    return(data.frame(Gene = cur_gene_set,
+                          avg_score = cur_gene_avgs,
+                          dset = cur_dset))
+})
+
+gene_avgs %<>% mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess))
+gene_avgs_wide <- spread(gene_avgs, dset, avg_score)
+
+ov_gene_sep_stats <- get_gene_avg_stats(dep_data, gene_avgs, names(dep_datasets), only_overlapping_genes = FALSE, use_bayes = use_bayes)
+
+```
+
+## 5c: The integrated D2 dataset provides improved identification of essential genes 
+
+Positive-negative control separation of average gene essentiality, as well as agreement with CRISPR estimates, is improved when using the combined D2 dataset, compared with using D2 on either dataset alone. The D2 combined data also outperforms a simple integration approach of normalizing and pooling the data (GA_comb). For these analyses we focus on the set of cell lines and genes common to the Achilles, DRIVE, and CRISPR datasets
+
+```{r, fig.width=8, fig.height=5}
+ov_gene_sep_stats %<>%
+    mutate(dset = factor(dset, levels = ov_gene_sep_stats %>% arrange(desc(ssmd)) %>% .[['dset']])) %>% 
+    mutate(model = str_match(as.vector(dset), '([:alnum:]+)_')[,2])
+
+CERES_cors <- cor(gene_avgs_wide[, setdiff(target_dsets, 'CERES_CRISPR')], gene_avgs_wide[, 'CERES_CRISPR', drop=F], use = 'pairwise.complete.obs')
+df <- data.frame(CERES_cors) %>% 
+    rownames_to_column(var = 'dset') %>% 
+    set_colnames(c('dset', 'cor')) %>% 
+    filter(grepl('D2', dset) | grepl('GA', dset)) %>% 
+    mutate(dset = paste0(dset, '_CRISPR')) %>% 
+    mutate(model = str_match(as.vector(dset), '([:alnum:]+)_')[,2])
+
+df %<>% mutate(dset = str_replace(dset, '_CRISPR', ''))
+p2 <- ggplot(df %>% mutate(dset = factor(dset, levels = df %>%
+                       arrange(desc(cor)) %>% .[['dset']])), 
+       aes(dset, cor, fill = model)) + 
+    geom_bar(stat = 'identity') +
+    guides(fill = FALSE) +
+    ylab('Correlation of cell line avg. with CRISPR') +
+    # xlab('Dataset') +
+    scale_fill_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) 
+
+# mylegend<-g_legend(p1)
+
+# p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+#                          p2 + theme(legend.position="none"),
+#                          nrow=1),
+#              mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'combined_Gavg_CRISPR_cor_compare.png'), plot = p2, width = 3.5, height = 3, dpi = 350)
+
+```
+
+
+```{r, include = FALSE}
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'CERES_CRISPR')
+cur_CL_set <- intersect(RNAi_common_CLs, rownames(dep_data$CERES_CRISPR$gene_scores))
+cur_gene_set_with_CRISPR <- intersect(cur_gene_set, colnames(dep_data$CERES_CRISPR$gene_scores))
+target_mat <- dep_data$CERES_CRISPR$gene_scores[cur_CL_set, cur_gene_set_with_CRISPR]
+
+CRISPR_cors <- get_mat_dep_cors(setdiff(target_dsets, 'CERES_CRISPR'), target_mat, use_bayes)
+CRISPR_cors %<>% left_join(gene_avgs %>% 
+                               filter(dset == 'D2_comb') %>% 
+                               dplyr::select(Gene, avg_essentiality = avg_score), 
+                           by = "Gene")
+```
+
+
+## 5d: The combined dataset gives better agreement with CRISPR
+
+Similar improvements with the combined D2 dataset over D2 on either dataset alone were observed when comparing the agreement of gene dependency profiles with CRISPR.
+
+```{r, fig.width=5, fig.height=4}
+dset_map <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', CERES_CRISPR = 'CRISPR')
+ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% 
+           mutate(dset = dset_map[dset]), 
+       aes(avg_essentiality, cor, color = dset)) + 
+    geom_smooth(lwd = 0.5) +
+    xlab('Cell line avg. dependency score') +
+    ylab('Avg. RNAi-CRISPR\ndependency corr') +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.4)) +
+    # scale_colour_Publication() +
+    scale_color_manual(values = data_type_pal) +
+    theme_Publication(base_font) +
+    theme(legend.text = element_text(size = rel(0.7)))
+
+ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 4, height = 3.5, dpi = 350)
+
+```
+
+
+```{r, include = FALSE}
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')
+bench_res_overlap <- get_target_biomarker_dep_cors(target_dsets, 
+                                                    CRISPR_benchmarks, 
+                                                    feature_data, 
+                                                   RNAi_common_genes, 
+                                                   RNAi_common_CLs)
+
+bench_cors_overlap <- bench_res_overlap %>% 
+    dplyr::select(-p.value) %>% 
+    spread(model, cor)
+
+```
+
+## 5e: Combined D2 improves benchmark-dependency relationships
+
+The D2 combined dataset also shows improved agreeement between dependencies and expected biomarkers using the curated benchmark set of dependency/biomarker pairs, giving correlations comprable to those found using CRISPR data. Again, this is using the set of CLs and genes overlapping between Achilles, DRIVE, and CRISPR datasets.
+
+```{r, fig.width=5, fig.height=4.5}
+map_names <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', 
+               GA_comb = 'GA comb')
+df <- bench_cors_overlap[, target_dsets] %>% melt()
+ggplot(df %>% filter(variable %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% mutate(variable = map_names[variable],
+                                                                                             variable = factor(variable, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb'))), aes(abs(value), color = variable)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    xlab('Feature-dep. corr. magnitude') +
+    ylab('CDF') + 
+    xlim(0.6, 0) +
+    ylim(0, 0.5) +
+    geom_vline(xintercept = bench_cor_thresh, linetype = 'dashed') +
+    # scale_colour_Publication() +
+    scale_color_manual(values = data_type_pal) +
+    theme_Publication(base_font) 
+    # theme(legend.text = element_text(size = 7))
+
+
+ggsave(file.path(fig_dir, 'combined_bench_ecdf.png'), width = 4.5, height = 4, dpi = 350)
+
+```
+
+```{r}
+df <- bench_cors_overlap[, c(target_dsets)] %>% melt()
+df %<>% 
+    group_by(variable) %>% 
+    summarise(n_strong = sum(abs(value) > bench_cor_thresh, na.rm=T),
+    # summarise(n_strong = sum(value < 1e-3, na.rm=T),
+              n_tot = sum(!is.na(value))) %>% 
+    mutate(frac_strong = n_strong / n_tot,
+           variable = map_names[variable])
+df %<>% mutate(variable = factor(variable, levels = df %>% 
+                                     arrange(desc(frac_strong)) %>% .[['variable']]))
+ggplot(df, aes(variable, frac_strong*100)) +
+    geom_bar(stat = 'identity') +
+    # scale_fill_manual(values = mod_type_pal) +
+    ylab('Percent strong\nfeature-dep correlation') +
+    theme_Publication() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          axis.title.x = element_blank()) 
+
+ggsave(file.path(fig_dir, 'bench_strong_cors_comb_bar.png'), width = 3, height = 2.5, dpi = 350)
+
+```
+
+
+## 5f: The combined dataset gives good agreement with benchmark set of biomarker relationships
+
+The statistical power provided by the combined D2 dataset is also substantially increased compared to using the other datsets, as shown by the large reduction in q-values for these benchmark biomarker dependency relationships.
+
+```{r, fig.width=5, fig.height=4.5}
+cur_bench_p <- bench_p %>% filter(Dep_Gene_ID %in% RNAi_common_genes)
+df <- cur_bench_p[, names(dep_datasets)] %>%
+    melt() %>% 
+    set_colnames(c('dset', 'p.value')) %>% 
+    group_by(dset) %>% 
+    mutate(q.value = p.adjust(p.value, method = 'BH')) %>% 
+    ungroup()
+
+ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% 
+           mutate(dset = map_names[as.vector(dset)],
+                  dset = factor(dset, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb'))), 
+                     aes(-log10(p.value), color = dset)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlim(60,0) +
+    ylim(0, 0.5) +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    xlab('Feature-dep corr -log10(p-value)') +
+    ylab('CDF') + 
+    # scale_colour_Publication() +
+    scale_color_manual(values = data_type_pal) +
+    theme_Publication(base_font) 
+    # theme(legend.text = element_text(size = rel(0.95)))
+
+ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 4.5, height = 4, dpi = 350)
+
+max_comb <- max(-log10(cur_bench_p$D2_comb), na.rm=T)
+cur_bench_p %<>% mutate(Dep_gene = str_match(Dep_gene, '(.+) ')[,2])
+ggplot(cur_bench_p, aes(-log10(D2_comb), -log10(D2_DRIVE))) + 
+    geom_point(alpha =0.5) + 
+    ylim(0, max_comb) + xlim(0, max_comb) +
+    geom_abline(linetype = 'dashed') + 
+    geom_text_repel(data = cur_bench_p %>% arrange(D2_comb) %>% head(10),
+                    aes(label = Dep_gene)) +
+    # geom_smooth(method = 'lm', color = 'red', se = FALSE) + 
+    ylab('-log10(p-value) D2-DRIVE') +
+    xlab('-log10(p-value) D2-comb') 
+ggsave(file.path(fig_dir, 'combined_scatter_p.png'), width = 4.5, height = 4, dpi = 350)
+
+```
+
+
+
+<!-- ## 5g: Improved biomarker identification (UBC Example) -->
+
+<!-- Using elastic net regression models, we compare the set of predictive features identified for UBC dependency using different dependency datasets. Using the D2 combined data shows the clearest identification of the expected predictors of high UBC expression and low UBB expression.  -->
+
+<!-- ```{r, fig.width = 7, fig.height = 7} -->
+<!-- dep_gene <- '7316' # UBC -->
+<!-- # dep_gene <- '4170' # MCL1 -->
+<!-- # dep_gene <- '598' # BCL2L1 -->
+<!-- # dep_gene <- '595' #CCND1 -->
+<!-- use_superpath <- FALSE -->
+
+<!-- target_deps <- c('D2_comb', 'D1_Ach', 'D1_DRIVE', 'CERES_CRISPR') -->
+
+<!-- X <- feature_data$GE -->
+<!-- X <- X[, apply(X, 2, var, na.rm=T) > 0.01] -->
+<!-- X <- scale(X, center = T, scale = T) -->
+
+<!-- gene_symbol <- Gene_ID_to_symb[dep_gene] -->
+<!-- if (!use_superpath) { -->
+<!--     cur_related_genes <- filter(related_genes, target == gene_symbol, source != 'superpathway') %>% .[['partner']] -->
+<!-- } else { -->
+<!--     cur_related_genes <- filter(related_genes, target == gene_symbol) %>% .[['partner']] -->
+<!-- } -->
+<!-- cur_related_genes %<>% append(gene_symbol) -->
+
+<!-- set.seed(12345) -->
+
+<!-- feature_df <- ldply(target_deps, function(dset) { -->
+<!--     y <- dep_data[[dset]]$gene_scores[, dep_gene] -->
+<!--     if (dep_datasets[[dset]]$mod_type == 'D2' & use_bayes) { -->
+<!--       w <- 1/dep_data$D2_comb$gene_score_SDs[, dep_gene]^2 -->
+<!--     } else { -->
+<!--       w <- rep(1, length(y)) %>% set_names(names(y)) -->
+<!--     } -->
+<!--     y <- (y - mean(y, na.rm=T)) / sd(y, na.rm=T) -->
+<!--     u <- intersect(rownames(X), names(y[!is.na(y)])) -->
+
+<!--     mod <- biomarkVS::fit_model(X[u,], y[u], Z = NULL, -->
+<!--               model = 'enet', -->
+<!--               model_type = 'regression', -->
+<!--               weights = w[u], -->
+<!--               mod_params = list( -->
+<!--                   alphas = c(0.75) -->
+<!--               ), -->
+<!--               feature_selection = NULL) -->
+<!--     cur_df <- mod$features %>% filter(!is.na(imp)) %>% -->
+<!--         mutate(feature = str_sub(feature, 2), -->
+<!--                dset = dset, -->
+<!--                R2 = mod$R2_OS) -->
+<!--     return(cur_df) -->
+<!-- }) %>% mutate(Gene = Gene_ID_to_symb[feature], -->
+<!--               is_related = Gene %in% cur_related_genes) -->
+
+<!-- ggplot(feature_df %>%  -->
+<!--          filter(beta != 0) %>%  -->
+<!--        mutate(dset = factor(dset, levels = c('D1_Ach', 'D1_DRIVE', 'D2_comb', 'CERES_CRISPR'))),  -->
+<!--      aes(pear_cor, beta, color = is_related)) + -->
+<!--     geom_point(alpha = 0.7, cex = 1.5) + -->
+<!--     geom_text_repel(data = feature_df %>% -->
+<!--                     group_by(dset) %>% -->
+<!--                     top_n(n = 10, wt = imp), -->
+<!--                     aes(label = Gene), size = 2.5) + -->
+<!--     xlab('Pearson cor') + -->
+<!--     ylab('Elastic net beta') + -->
+<!--     guides(color = guide_legend(title = 'Related feature')) + -->
+<!--     geom_hline(yintercept = 0, linetype = 'dashed') + -->
+<!--     geom_vline(xintercept = 0, linetype = 'dashed') + -->
+<!--     facet_wrap(~dset, nrow = 2) + -->
+<!--     # scale_colour_Publication() + -->
+<!--     scale_color_manual(values = c(`FALSE` = 'black', `TRUE` = 'red')) + -->
+<!--     theme_Publication(base_font) -->
+
+<!-- ggsave(file.path(fig_dir, sprintf('combined_biomark_example_%s.png', gene_symbol)), width = 6, height = 6, dpi = 350) -->
+
+
+<!-- ``` -->
+
+
+
+
+
+## 5h: Improved identification of relevant biomarkers
+
+The number of gene dependencies where the top correlated gene expression feature is either the gene itself, or a 'related gene' is shown for different dependency datasets. Using the combined D2 dataset provides the most power to identify these putative biomarker relationships, even compared with the CRISRP dataset.
+
+
+```{r, fig.width=5, fig.height=4}
+include_superpath <- FALSE
+ targ_dsets <- c('D2_comb', 'D2_DRIVE', 'D1_DRIVE', 'GA_Ach', 'GA_DRIVE', 'D1_Ach', 'D2_Ach', 'CERES_CRISPR')
+ 
+if (!is.null(biomarker_res_cache_GE) & !recompute_biomarker) {
+    rel_an <- read_rds(biomarker_res_cache_GE)
+} else {
+    feature_mat <- feature_data$GE
+    rel_an <- get_top_biomarker_cors(targ_dsets, dep_data, feature_mat, Gene_ID_to_symb, related_genes, use_bayes = use_bayes, cache_file = biomarker_res_cache_GE)
+    write_rds(rel_an, biomarker_res_cache_GE)
+}
+
+#For CN
+if (!is.null(biomarker_res_cache_CN) & !recompute_biomarker) {
+    rel_an <- read_rds(biomarker_res_cache_CN)
+} else {
+    feature_mat <- feature_data$CN
+    rel_an <- get_top_biomarker_cors(targ_dsets, dep_data, feature_mat, Gene_ID_to_symb, related_genes, use_bayes = use_bayes, cache_file = biomarker_res_cache_CN)
+    write_rds(rel_an, biomarker_res_cache_CN)
+}
+
+#For MUT_DAM
+if (!is.null(biomarker_res_cache_DAM_MUT) & !recompute_biomarker) {
+    rel_an <- read_rds(biomarker_res_cache_DAM_MUT)
+} else {
+    feature_mat <- feature_data$MUT_DAM
+    rel_an <- get_top_biomarker_cors(targ_dsets, dep_data, feature_mat, Gene_ID_to_symb, related_genes, use_bayes = use_bayes, cache_file = biomarker_res_cache_DAM_MUT)
+    write_rds(rel_an, biomarker_res_cache_DAM_MUT)
+}
+
+#For MUT_HOT
+if (!is.null(biomarker_res_cache_HOT_MUT) & !recompute_biomarker) {
+    rel_an <- read_rds(biomarker_res_cache_HOT_MUT)
+} else {
+    feature_mat <- feature_data$MUT_HOT
+    rel_an <- get_top_biomarker_cors(targ_dsets, dep_data, feature_mat, Gene_ID_to_symb, related_genes, use_bayes = use_bayes, cache_file = biomarker_res_cache_HOT_MUT)
+    write_rds(rel_an, biomarker_res_cache_HOT_MUT)
+}
+```
+
+
+```{r}
+include_superpath <- FALSE
+
+rel_an <- read_rds(biomarker_res_cache_GE) %>% 
+    mutate(feat_type = 'GE')
+rel_an %<>% rbind(read_rds(biomarker_res_cache_CN) %>% mutate(feat_type = 'CN'))
+rel_an %<>% rbind(read_rds(biomarker_res_cache_DAM_MUT) %>% mutate(feat_type = 'MUT_DAM'))
+rel_an %<>% rbind(read_rds(biomarker_res_cache_HOT_MUT) %>% mutate(feat_type = 'MUT_HOT'))
+
+rel_an %<>% group_by(dset, targ_gene) %>% 
+    top_n(n = 1, wt = abs(cor)) %>% 
+    ungroup()
+
+if (!include_superpath) {
+    rel_an %<>% filter(source != 'superpathway')
+}
+
+rel_an %<>% filter(dset != 'CERES_CRISPR')
+
+rel_an_any <- rel_an %>% 
+    group_by(dset, targ_gene) %>% 
+    summarise(is_related = max(!is.na(source)) > 0)
+rel_an_same <- rel_an %>% 
+    group_by(dset, targ_gene) %>% 
+    summarise(is_same = sum(source == 'same', na.rm=T) > 0)
+rel_an_comb <- full_join(rel_an_any, rel_an_same, by = c('dset', 'targ_gene'))
+
+sum_stats <- rel_an_comb %>%
+    group_by(dset) %>% 
+    summarise(related = sum(is_related & !is_same, na.rm=T),
+              same = sum(is_same))
+sum_stats %<>% mutate(dset = str_replace_all(dset, '_', ' '),
+                  dset = str_replace_all(dset, 'CERES ', ''))
+
+mod_order <- sum_stats %>% 
+    mutate(tot = related + same) %>% 
+    arrange(desc(tot)) %>% 
+    .[['dset']]
+sum_stats %<>% mutate(dset = factor(dset, levels = mod_order))
+
+darkcols <- brewer.pal(8, "Dark2")
+sum_stats %>% melt(id.vars = 'dset', variable.name = 'feature_relationship') %>% 
+    ggplot(aes(dset, value, fill = feature_relationship)) + 
+    geom_bar(stat = 'identity', position = 'stack') +  
+    ylab('Num. dep.-feature pairs') +
+    guides(fill = guide_legend(title = 'Feature relationship')) +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = c(related = darkcols[1], same = darkcols[2])) +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) 
+
+ggsave(file.path(fig_dir, 'combined_N_biomarks_found.png'), width = 4, height = 3.5, dpi = 350)
+
+sum_stats %<>% mutate(total = related + same)
+temp <- sum_stats %>% as.data.frame() %>% column_to_rownames(var = 'dset') %>% t
+(temp['total', 'D2 comb'] - temp['total', 'D2 DRIVE']) / (temp['total', 'D2 DRIVE'])
+(temp['total', 'D2 comb'] - temp['total', 'D2 Ach']) / (temp['total', 'D2 Ach'])
+(temp['total', 'D2 comb'] - temp['total', 'D1 Ach']) / (temp['total', 'D1 Ach'])
+(temp['total', 'D2 comb'] - temp['total', 'GA Ach']) / (temp['total', 'GA Ach'])
+(temp['total', 'D2 comb']) / (temp['total', 'GA Ach'])
+
+
+rel_an %<>% mutate(MDP = NA,
+   MDP = ifelse(cor > 0 & feat_type %in% c('GE', 'CN') & source == 'same', 'Cyclops', MDP),
+  MDP = ifelse(cor < 0 & feat_type %in% c('MUT_HOT') & source == 'same', "Onc mut", MDP),
+  MDP = ifelse(cor < 0 & feat_type %in% c('GE', 'CN') & source == 'same', 'Onc exp', MDP),
+  MDP = ifelse(cor > 0 & feat_type %in% c('GE', 'CN', 'MUT_DAM') & source == 'paralog', 'paralog loss', MDP),
+  MDP = ifelse(source %in% c('CORUM', 'ppi'), "physical interaction", MDP)
+)
+
+sum_stats <- rel_an %>%
+    filter(!is.na(MDP)) %>% 
+    group_by(dset, MDP) %>% 
+    summarise(n = n()) %>% 
+    ungroup()
+sum_stats %<>% mutate(dset = str_replace_all(dset, '_', ' '),
+                  dset = str_replace_all(dset, 'CERES ', ''))
+mod_order <- sum_stats %>% 
+    group_by(dset) %>% 
+    summarise(tot = sum(n)) %>% 
+    arrange(desc(tot)) %>% 
+    .[['dset']]
+sum_stats %<>% mutate(dset = factor(dset, levels = mod_order))
+
+ggplot(sum_stats, 
+       aes(dset, n, fill = MDP)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    ylab('Num. dep.-feature pairs') +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(0.7))) +
+    guides(fill = guide_legend(title = element_blank(), nrow = 2)) 
+
+ggsave(file.path(fig_dir, 'combined_top_MDP_class.png'), width =4, height = 3.5, dpi = 350)
+
+ggplot(sum_stats, 
+       aes(dset, n)) +
+    geom_bar(stat = 'identity') +
+    ylab('Num. dep.-feature pairs') +
+    theme_Publication(base_font) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
+    theme(legend.text = element_text(size = rel(0.7))) 
+
+ggsave(file.path(fig_dir, 'combined_top_class_tot.png'), width =4, height = 3.5, dpi = 350)
+
+write_rds(rel_an %>% filter(!is.na(MDP)), '~/CPDS/demeter2/results/top_MDP_stats.rds')
+```
+
+
+<!-- ## 5g CRISPR-RNAi compare -->
+
+<!-- ```{r} -->
+<!-- target_dsets <- c('D2_comb', 'CERES_CRISPR') -->
+<!-- cur_gene_set <- NULL -->
+<!-- cur_CL_set <- NULL -->
+<!-- bench_res <- get_target_biomarker_dep_cors(target_dsets, curated_benchmarks, feature_data, cur_gene_set, cur_CL_set) -->
+
+<!-- bench_cors <- bench_res %>% -->
+<!--     dplyr::select(-p.value) %>% -->
+<!--     spread(model, cor) -->
+
+<!-- bench_p <- bench_res %>% -->
+<!--     dplyr::select(-cor) %>% -->
+<!--     spread(model, p.value) -->
+
+<!-- ggplot(bench_cors, aes(D2_comb, CERES_CRISPR)) + -->
+<!--     geom_text_repel(data = bench_cors %>% arrange(desc(abs(D2_comb) + abs(CERES_CRISPR))) %>% head(10), aes(label = Dep_Gene, color = feat_type)) + -->
+<!--     geom_smooth(method = 'lm', color = 'darkgray', alpha = 0.25) + -->
+<!--     geom_point(aes(color = feat_type)) + -->
+<!--     geom_abline() + -->
+<!--     guides(color = guide_legend(nrow=2)) + -->
+<!--     xlab('D2 combined RNAi\nfeature-dep corr') + -->
+<!--     ylab('CRISPR\nfeature-dep corr') + -->
+<!--     theme_Publication(base_font) + -->
+<!--     scale_colour_Publication() -->
+<!-- ggsave(file.path(fig_dir, 'RNAi_CRISPR_corr_compare.png'), width =4, height = 4, dpi = 350) -->
+
+<!-- ggplot(bench_p, aes(-log10(D2_comb), -log10(CERES_CRISPR), color = feat_type)) + -->
+<!--     geom_text_repel(data = bench_p %>% arrange(desc(-log10(D2_comb) - log10(CERES_CRISPR))) %>% head(10), aes(label = Dep_Gene)) + -->
+<!--     geom_point() + -->
+<!--     geom_abline() + -->
+<!--     guides(color = guide_legend(nrow=2)) + -->
+<!--     xlab('D2 combined RNAi\nfeature-dep -log10(p-val)') + -->
+<!--     ylab('CRISPR\nfeature-dep -log10(p-val)') + -->
+<!--     theme_Publication(base_font) + -->
+<!--     scale_colour_Publication() -->
+<!-- ggsave(file.path(fig_dir, 'RNAi_CRISPR_p_compare.png'), width =4, height = 4, dpi = 350) -->
+
+<!-- with(bench_cors, t.test(abs(D2_comb), abs(CERES_CRISPR), paired=T)) -->
+<!-- ``` -->
+
+
+
+# Supplemental Figs
+
+### S1: RNAi efficacy is closely related with screen quality
+
+Inferred RNAi efficacy per CL plotted against the positive negative control separation of the CL (PR-AUC, using GA essentiality estimates)
+
+```{r, fig.width=5, fig.height=4}
+df <- per_CL_stats %>% left_join(
+    data.frame(AGO2_GE = feature_data$GE[, '27161'], CCLE_ID = rownames(feature_data$GE)), by = 'CCLE_ID') %>% 
+    left_join(Ach_CL_data %>% dplyr::select(Ach_gene_slope = gene_slope, CCLE_ID), by = 'CCLE_ID') %>% 
+    left_join(DRIVE_CL_data %>% dplyr::select(DRIVE_gene_slope = gene_slope, CCLE_ID), by = 'CCLE_ID')
+
+ggplot(df, aes(pr)) + 
+    ylab('Inferred screen signal') +
+    xlab('Precision-recall AUC') +
+    geom_point(data = df %>% filter(dset == 'GA_Ach'), alpha = 0.75, shape = 21, size = 2, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles')) +
+    geom_point(data = df %>% filter(dset == 'GA_DRIVE'), alpha = 0.75, shape = 21, size = 2, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE')) +
+    geom_smooth(data = df %>% filter(dset == 'GA_Ach'), alpha = 0.25, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles'), method = 'lm', size = 0.5) +
+    geom_smooth(data = df %>% filter(dset == 'GA_DRIVE'), alpha = 0.25, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE'), method = 'lm', size = 0.5) +
+    guides(fill = guide_legend(title = '')) +
+    scale_y_log10() +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication()
+
+ggsave(file.path(fig_dir, 'PR_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
+
+
+ggplot(df, aes(ssmd)) + 
+    ylab('Inferred screen signal') +
+    xlab('Pos-neg control separation (SSMD)') +
+    geom_point(data = df %>% filter(dset == 'GA_Ach'), alpha = 0.75, shape = 21, size = 2, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles')) +
+    geom_point(data = df %>% filter(dset == 'GA_DRIVE'), alpha = 0.75, shape = 21, size = 2, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE')) +
+    geom_smooth(data = df %>% filter(dset == 'GA_Ach'), alpha = 0.25, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles'), method = 'lm', size = 0.5) +
+    geom_smooth(data = df %>% filter(dset == 'GA_DRIVE'), alpha = 0.25, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE'), method = 'lm', size = 0.5) +
+    guides(fill = guide_legend(title = '')) +
+    scale_y_log10() +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication()
+
+ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
+
+```
+
+### S2: Agreement between Achilles and DRIVE RNAi efficacy estimates
+
+```{r, fig.width=5, fig.height=4}
+DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F)
+Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F)
+Marc_CL_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_data.csv'), stringsAsFactors = F)
+Marc_CL_data %<>% mutate(CCLE_ID = clean_CL_names_with_missing(CCLE_ID))
+
+Ach_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F)
+DRIVE_CL_batch_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F)
+Marc_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_batch_data.csv'), stringsAsFactors = F)
+Marc_CL_batch_data %<>% mutate(CCLE_ID = clean_CL_names_with_missing(CCLE_ID))
+
+Ach_CL_slope <- Ach_CL_batch_data %>% 
+    group_by(CCLE_ID) %>% 
+    summarise(Ach_CL_slope = mean(CL_slope, na.rm=T))
+DRIVE_CL_slope <- DRIVE_CL_batch_data %>% 
+    group_by(CCLE_ID) %>% 
+    summarise(DRIVE_CL_slope = mean(CL_slope, na.rm=T))
+Marc_CL_slope <- Marc_CL_batch_data %>% 
+    group_by(CCLE_ID) %>% 
+    summarise(Marc_CL_slope = mean(CL_slope, na.rm=T))
+
+CL_data <- full_join(DRIVE_CL_data, Ach_CL_data, by = 'CCLE_ID', suffix = c('_DRIVE', '_Ach')) %>% 
+    left_join(Marc_CL_data %>% 
+                  dplyr::select(CCLE_ID, gene_slope_Marc = gene_slope), 
+              by = "CCLE_ID") %>% 
+    left_join(data.frame(CCLE_ID = rownames(feature_data$GE), AGO2_GE = feature_data$GE[, '27161'])) %>% 
+    left_join(Ach_CL_slope, by = 'CCLE_ID') %>% 
+    left_join(DRIVE_CL_slope, by = 'CCLE_ID') %>% 
+    left_join(Marc_CL_slope, by = 'CCLE_ID')
+
+ggplot(CL_data, aes(gene_slope_Ach, gene_slope_DRIVE)) + 
+    geom_point(alpha = 0.75, shape = 21, size = 2, color = 'white', fill = 'black', alpha = 0.75) + 
+    # geom_smooth(method = 'lm') +
+    coord_cartesian(xlim = c(0,4), ylim = c(0, 4)) +
+    xlab('Screen signal (Achilles)') +
+    ylab('Screen signal (DRIVE)') +
+    theme_Publication(base_font)
+
+ggsave(file.path(fig_dir, 'RNAi_eff_compare.png'), width = 4, height = 3.5, dpi = 350)
+
+```
+
+
+```{r, include = FALSE}
+use_common_genes <- FALSE
+if (use_common_genes) {
+    target_mat <- dep_data$D2_Ach$gene_scores[, common_dep_genes]
+} else {
+    target_mat <- dep_data$D2_Ach$gene_scores
+}
+target_deps <- c('D1_Ach', 'ATARiS_Ach', 'GA_Ach')
+D2_Ach_cors <- get_mat_dep_cors(target_deps, target_mat, use_bayes)
+D2_Ach_cors %<>% left_join(gene_avgs %>% 
+                               filter(dset == 'D2_comb') %>% 
+                               dplyr::select(Gene, avg_essentiality = avg_score),
+                           by = "Gene")
+
+if (use_common_genes) {
+    target_mat <- dep_data$D2_DRIVE$gene_scores[, common_dep_genes]
+} else {
+    target_mat <- dep_data$D2_DRIVE$gene_scores
+}
+target_deps <- c('D1_DRIVE', 'ATARiS_DRIVE', 'GA_DRIVE')
+D2_DRIVE_cors <- get_mat_dep_cors(target_deps, target_mat, use_bayes)
+D2_DRIVE_cors %<>% left_join(gene_avgs %>% 
+                               filter(dset == 'D2_comb') %>% 
+                               dplyr::select(Gene, avg_essentiality = avg_score),
+                           by = "Gene")
+
+```
+
+### S3: Average correlation between D2 and other gene essentiality estimates
+
+```{r, fig.width=9, fig.height=5}
+p1 <- ggplot(D2_Ach_cors %>% mutate(model = str_match(dset, '([:alnum:]+)_')[,2]), 
+       aes(avg_essentiality, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('D2 Ach correlation') +
+    xlab('Average essentiality') +
+    # xlim(-1.5, 0.5) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0,1)) +
+    guides(color = guide_legend(title = '')) +
+    scale_color_manual(values = mod_type_pal) +
+    # scale_colour_Publication() + 
+    theme_Publication()
+
+p2 <- ggplot(D2_DRIVE_cors %>% mutate(model = str_match(dset, '([:alnum:]+)_')[,2]), 
+       aes(avg_essentiality, cor, color = model)) + 
+    geom_smooth(lwd = 0.5) +
+    ylab('D2 DRIVE correlation') +
+    xlab('Average essentiality') +
+    # xlim(-1.5, 0.5) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0,1)) +
+    guides(color = guide_legend(title = '')) +
+    scale_color_manual(values = mod_type_pal) +
+    # scale_colour_Publication() + 
+    theme_Publication()
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+ggsave(file.path(fig_dir, 'D2_corrs_smooth.png'), plot = p, width = 7, height = 3.5, dpi = 350)
+
+```
+
+### S4: Normalizing by pos/neg controls per cell line amplifies noise
+
+Plots of example low and high-quality cell lines' gene scores vs the population average for the per-gene average estimates (GA), where gene scores are normalized in two different ways. Either by the pos-neg control separation of the population average gene scores ('Global-norm'), or where each cell-lines' gene scores are normalized so the median of pos and neg controls are at -1 and 0 (ind-norm). The latter eliminates differences in pos-neg control separation between cell lines, by construction, but also amplifies the noise of low-quality cell lines.
+
+
+```{r, fig.width=6, fig.height=8}
+#normalize GA by pos-neg sep for each cell line individually
+cur_pos_cons <- intersect(hart_ess, colnames(dep_data$GA_Ach$gene_scores))
+cur_neg_cons <- intersect(hart_non_ess, colnames(dep_data$GA_Ach$gene_scores))
+pos_medians <- apply(dep_data$GA_Ach$gene_scores[, cur_pos_cons], 1, median, na.rm=T)
+neg_medians <- apply(dep_data$GA_Ach$gene_scores[, cur_neg_cons], 1, median, na.rm=T)
+norm_gs <- t(scale(t(dep_data$GA_Ach$gene_scores), center = neg_medians, scale = (neg_medians - pos_medians)))
+dep_data$GAPN_Ach <- list(gene_scores = norm_gs, mod_type = 'GA', dataset = 'Ach', type = 'abs')
+
+#normalize GA by pos-neg sep for each cell line individually (now for DRIVE)
+cur_pos_cons <- intersect(hart_ess, colnames(dep_data$GA_DRIVE$gene_scores))
+cur_neg_cons <- intersect(hart_non_ess, colnames(dep_data$GA_DRIVE$gene_scores))
+pos_medians <- apply(dep_data$GA_DRIVE$gene_scores[, cur_pos_cons], 1, median, na.rm=T)
+neg_medians <- apply(dep_data$GA_DRIVE$gene_scores[, cur_neg_cons], 1, median, na.rm=T)
+norm_gs <- t(scale(t(dep_data$GA_DRIVE$gene_scores), center = neg_medians, scale = (neg_medians - pos_medians)))
+dep_data$GAPN_DRIVE <- list(gene_scores = norm_gs, mod_type = 'GA', dataset = 'DRIVE', type = 'abs')
+
+cur_dsets <- c('GA_Ach', 'GAPN_Ach')
+gene_avgs <- ldply(cur_dsets, function(cur_dset) {
+    cur_gene_avgs <- colMeans(dep_data[[cur_dset]]$gene_scores, na.rm=T)
+    return(data.frame(Gene = colnames(dep_data[[cur_dset]]$gene_scores),
+                      avg_score = cur_gene_avgs,
+                      dset = cur_dset))
+}) %>% mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess))
+
+
+test_CLs <- c('A3KAW_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE', 'HT29_LARGE_INTESTINE')
+p1 <- make_CL_vs_avg_plot('GA_Ach', test_CLs, gene_avgs) +
+    scale_color_manual(values = gene_type_pal) +
+    ggtitle('Global norm') +
+    theme_Publication()
+p2 <- make_CL_vs_avg_plot('GAPN_Ach', test_CLs, gene_avgs) +
+    scale_color_manual(values = gene_type_pal) +
+    ggtitle('Per cell line norm') +
+    theme_Publication()
+
+mylegend<-g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=2),
+             mylegend, nrow=2,heights=c(18, 1))
+ggsave(file.path(fig_dir, 'GAnorm_MA_compare.png'), plot = p, width = 5, height = 7, dpi = 350)
+
+```
+
+```{r, fig.width=5, fig.height=4}
+target_dsets <- c('GA_Ach', 'GAPN_Ach', 'GA_DRIVE', 'GAPN_DRIVE')
+names(target_dsets) <- c('Global_norm_Achilles', 'CL_norm_Achilles',
+'Global_norm_DRIVE', 'CL_norm_DRIVE')
+
+
+cur_gene_set <- NULL
+cur_CL_set <- NULL
+bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set)
+map_names <- names(target_dsets) %>% set_names(target_dsets)
+bench_res_test %<>% mutate(model = map_names[model],
+                           norm_type = ifelse(grepl('CL_norm', model), 'Per cell line norm', 'Global norm'),
+                           dataset = ifelse(grepl('Ach', model), 'Achilles', 'DRIVE'))
+ggplot(bench_res_test,
+       aes(abs(cor), color = dataset, linetype = norm_type)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlab('Correlation magnitude |r|') +
+    ylab('CDF') +
+    xlim(0.6, 0) +
+    ylim(0, 0.5) +
+    guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3)), 
+           linetype = guide_legend(title = element_blank(), nrow=2, keyheight = 1.15)) +
+    scale_color_manual(values = data_type_pal) +
+    # scale_colour_Publication() +
+    theme_Publication() 
+
+ggsave(file.path(fig_dir, 'GAnorm_benchmark_ecdf.png'), width = 5, height = 4.5, dpi = 350)
+
+```
+
+
+### S5: Cross-validated estimates of pos-neg control separation
+
+Positive and negative control gene sets are split into train and test sets (50% in each). Only the 'train' sets are used for estimating RNAi efficacy parameters during training. Then, the pos-neg control separation of average gene essentiality estimates is evaluated using the independent test sets of pos and neg control genes. SSMD values for both the train and test sets are shown.
+
+```{r, include = FALSE}
+target_dir <- '~/CPDS/demeter2/kube_results/Ach_gene_xval'
+model_dirs <- list.dirs(path = target_dir, full.names = TRUE, recursive = FALSE)
+test_SSMD <- ldply(model_dirs, function(mod_dir) {
+    print(mod_dir)
+    if (file.exists(file.path(mod_dir, 'other_info.json'))) {
+    mod_res <- jsonlite::read_json(file.path(mod_dir, 'other_info.json'))
+    df <- data.frame(
+        train_SSMD = mod_res$SSMD$train %>% unlist %>% tail(1),
+        test_SSMD = mod_res$SSMD$test %>% unlist %>% tail(1)
+    )
+    return(df)
+    }
+})
+cmap <- c(train_SSMD = 'Train', test_SSMD = 'Test')
+
+```
+
+```{r, fig.width=5, fig.height=4}
+print(with(test_SSMD, t.test(train_SSMD, test_SSMD, paired = TRUE)))
+test_SSMD %>% melt() %>% 
+    mutate(type = cmap[variable]) %>% 
+    ggplot(aes(type, value)) +
+    geom_boxplot(alpha = 0.5, outlier.shape = NA) + 
+    geom_jitter(width = 0.15, alpha = 0.75, cex = 2) +
+    ylab('Pos-neg control separation (SSMD)') +
+    theme(axis.title.x = element_blank())
+
+ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 4, height = 4, dpi = 350)
+
+
+```
+
+## S6 Scale param v doubling time
+```{r}
+Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>%
+    left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
+    group_by(CCLE_ID) %>% 
+    summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% 
+    mutate(dset = 'Achilles')
+
+DRIVE_CL_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>%
+    left_join(read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
+    group_by(CCLE_ID) %>% 
+    summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% 
+    mutate(dset = 'DRIVE')
+
+df <- rbind(Ach_CL_data, DRIVE_CL_data) %>% 
+    left_join(
+        read_csv('~/CPDS/data/Achilles/shRNA/TableS1_SampleInfo.csv') %>% 
+            dplyr::select(CCLE_ID = Name, Passage = `Passage number`, Days = `Days in culture`, Doubling_time = `Doubling time (hrs)`)) %>% 
+    filter(!grepl('>', Doubling_time)) %>% 
+    mutate(Doubling_time = as.numeric(str_replace_all(Doubling_time, '[ hrs]', ''))) %>% 
+    mutate(num_doublings = Days*24/Doubling_time)
+    
+p1 <- ggplot(df, aes(ov_slope, Doubling_time)) + 
+    geom_point(alpha = 0.75) + 
+    scale_y_log10() +
+    scale_x_log10() +
+    ylab('Doubling time (hrs)') +
+    xlab('Overall scale term') +
+    geom_smooth(method = 'lm') +
+    theme_Publication() +
+    facet_wrap(~dset)
+
+p2 <- ggplot(df, aes(gene_slope, Doubling_time)) + 
+    geom_point(alpha = 0.75) + 
+    scale_y_log10() +
+    scale_x_log10() +
+    geom_smooth(method = 'lm') +
+    ylab('Doubling time (hrs)') +
+    xlab('Screen signal term') +
+    theme_Publication() +
+    facet_wrap(~dset)
+
+cowplot::plot_grid(p1, p2, nrow=2)
+ggsave(file.path(fig_dir, 'doubling_time_scatter.png'), width = 7, height = 7, dpi = 350)
+
+```
+
+## LFC SSMD compare
+
+```{r}
+CE_bc <- filter(sh_targets, `Gene ID` %in% hart_ess) %>% .[['Barcode Sequence']]
+NE_bc <- filter(sh_targets, `Gene ID` %in% hart_non_ess) %>% .[['Barcode Sequence']]
+used_bc <- unique(c(CE_bc, NE_bc))
+
+BGPD.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='BGPD_LFC_mat')
+poolA.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='poolA_LFC_mat')
+poolB.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='poolB_LFC_mat')
+
+Ach_98k <- load.from.taiga(data.name = 'achilles-98k-repcollapsed-lfc-19ce', data.version = 1)
+Ach_55k1 <- load.from.taiga(data.name = 'achilles-55k-batch1-repcollapsed-lfc-d708', data.version = 1)
+Ach_55k2 <- load.from.taiga(data.name = 'achilles-55k-batch2-repcollapsed-lfc-bd7f', data.version = 1)
+
+DRIVE_df <- bind_rows(
+    list(
+        BGPD.LFC.mat %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc),
+        poolA.LFC.mat %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc),
+        poolB.LFC.mat %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc)
+    )
+)
+
+Ach_df <- bind_rows(
+    list(
+        Ach_98k %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc),
+        Ach_55k1 %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc),
+        Ach_55k2 %>% 
+            scale(center = TRUE, scale = TRUE) %>%
+            melt() %>% set_colnames(c('barcode', 'CCLE_ID', 'LFC')) %>% 
+            filter(barcode %in% used_bc)
+    )
+)
+
+all_df <- rbind(
+    Ach_df %>% mutate(dset = 'Achilles'),
+    DRIVE_df %>% mutate(dset = 'DRIVE')
+) %>% mutate(b_type = ifelse(barcode %in% CE_bc, 'ess', 'non_ess'))
+all_df <- rbind(
+    Ach_df %>% mutate(dset = 'Achilles'),
+    DRIVE_df %>% mutate(dset = 'DRIVE')
+) %>% mutate(b_type = ifelse(barcode %in% CE_bc, 'ess', 'non_ess'))
+cl_avgs <- all_df %>% 
+    ddply(.(dset, CCLE_ID), function(df) {
+        data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
+    })
+hp_ssmds <- spread(cl_avgs, dset, SSMD)
+ggplot(hp_ssmds, aes(Achilles, DRIVE)) + 
+    geom_point(alpha = 0.75) + 
+    geom_abline() +
+    xlab('Achilles pos/neg separation (SSMD)') +
+    ylab('DRIVE pos/neg separation (SSMD)') +
+    theme_Publication() + 
+    ggtitle('shRNA')
+ggsave(file.path(fig_dir, 'LFC_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
+
+
+only_overlapping_genes <- TRUE
+neg_control_type <- 'non_essential'
+# neg_control_type <- 'unexpressed'
+
+temp_per_CL_stats <- get_per_CL_stats(dep_data, c('GA_DRIVE', 'GA_Ach'), only_overlapping_genes, neg_control_type, feature_data$GE, hart_ess, hart_non_ess, use_bayes = use_bayes)
+temp_per_CL_stats %<>% dplyr::select(ssmd, CCLE_ID, dset) %>% 
+    spread(dset, ssmd)
+ggplot(temp_per_CL_stats, aes(GA_Ach, GA_DRIVE)) + 
+    geom_point(alpha = 0.75) + 
+    geom_abline() +
+    xlab('Achilles pos/neg separation (SSMD)') +
+    ylab('DRIVE pos/neg separation (SSMD)') +
+    theme_Publication() +
+    ggtitle('Gene')
+ggsave(file.path(fig_dir, 'GA_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
+with(temp_per_CL_stats, wilcox.test(GA_Ach, GA_DRIVE))
+
+binwidth <- 0.1
+comb_hp_data <- Ach_hp_data %>% mutate(dset = 'Achilles') %>% 
+    rbind(DR_hp_data %>% mutate(dset = 'DRIVE'))
+avg_Ach <- mean(Ach_hp_data$Geff, na.rm=T)
+avg_DR <- mean(DR_hp_data$Geff, na.rm=T)
+ggplot(comb_hp_data, aes(Geff)) + 
+    geom_histogram(data = filter(comb_hp_data, dset == 'Achilles'), 
+                     aes(y = 0.1*..density.., fill = 'Achilles', color = 'Achilles'), binwidth = 0.1, alpha = 0.35) +
+    geom_histogram(data = filter(comb_hp_data, dset == 'DRIVE'), 
+                     aes(y = 0.1*..density..,fill = 'DRIVE', color = 'DRIVE'), binwidth = 0.1, alpha = 0.35) +
+    guides(color = FALSE, fill = guide_legend(title = element_blank())) +
+    geom_vline(xintercept = avg_Ach, color = 'blue', linetype = 'dashed', lwd = 1.) +
+    geom_vline(xintercept = avg_DR, color = 'orange', linetype = 'dashed', lwd = 1.) +
+    ylab('Relative frequency') +
+    xlab('Estimated shRNA gene KD efficacy') +
+    scale_fill_Publication() +scale_colour_Publication() +
+    theme_Publication()
+ggsave(file.path(fig_dir, 'DR_Ach_hpeff_compare.png'), width = 4.5, height = 4, dpi = 350)
+
+```
+
+## Ach-DRIVE dep SD compare
+```{r}
+common_genes <- intersect(colnames(dep_data$D2_Ach$gene_score_SDs), colnames(dep_data$D2_DRIVE$gene_scores))
+
+# cur_dep <- dep_data$GA_Ach$gene_scores
+cur_dep <- dep_data$GA_Ach$gene_scores[, common_genes]
+
+exp_set <- feature_data$GE[match(rownames(cur_dep),rownames(feature_data$GE)), match(colnames(cur_dep),colnames(feature_data$GE))]
+
+df <- data.frame(dset = 'Achilles', dep = cur_dep[exp_set < GE_thresh])
+df_ess <- data.frame(dset = 'Achilles', dep = cur_dep[, colnames(cur_dep) %in% hart_ess] %>% as.vector())
+
+# cur_dep <- dep_data$GA_DRIVE$gene_scores
+cur_dep <- dep_data$GA_DRIVE$gene_scores[, common_genes]
+exp_set <- feature_data$GE[match(rownames(cur_dep),rownames(feature_data$GE)), match(colnames(cur_dep),colnames(feature_data$GE))]
+
+df %<>% rbind(data.frame(dset = 'DRIVE', dep = cur_dep[exp_set < GE_thresh]))
+df_ess %<>% rbind(data.frame(dset = 'DRIVE', dep = cur_dep[, colnames(cur_dep) %in% hart_ess] %>% as.vector()))
+
+ggplot(df, aes(dep, fill = dset)) + 
+    geom_density(alpha = 0.5) + 
+    xlab('Non-essential gene dependency score') +
+    ylab('Density') +
+    scale_fill_manual(values = data_type_pal) +
+    theme_Publication()
+ggsave(file.path(fig_dir, 'Ach_DRIVE_gene_SD_compare.png'), width = 4., height = 4, dpi = 350)
+
+
+comb <- rbind(df %>% mutate(type = 'non_ess'), df_ess %>% mutate(type = 'ess')) %>% 
+    mutate(set = paste0(dset, '_', type))
+ggplot(comb, aes(dep, fill = set)) + 
+    geom_density(alpha = 0.5) + 
+    xlab('Essential gene dependency score') +
+    ylab('Density') +
+    # scale_fill_manual(values = data_type_pal) +
+    theme_Publication()
+
+gene_avgs <- get_gene_avgs(dep_data, names(dep_datasets), hart_ess, hart_non_ess, use_bayes = use_bayes) %>% 
+    mutate(Gene = as.character(Gene))
+
+temp <- gene_avgs %>% 
+    filter(dset %in% c('GA_DRIVE', 'GA_Ach'), gene_type != 'other') %>% 
+    mutate(data_set = str_match(dset, '_(.+)')[,2],
+           data_set = ifelse(data_set == 'Ach', 'Achilles', data_set),
+           gene_type = ifelse(gene_type == 'essential', 'essential genes', 'non-essential genes')) 
+ggplot(temp, aes(gene_type, avg_score, fill = data_set)) + 
+    geom_violin(alpha = 0.5) +
+    # scale_colour_manual(values = data_type_pal) + 
+    scale_fill_manual(values = data_type_pal) +
+    ylab('Cell line avg. dependency') + 
+    guides(color = guide_legend(title = element_blank()),
+           fill = guide_legend(title = element_blank())) +
+    theme_Publication() +
+    theme(axis.title.x = element_blank())
+ggsave(file.path(fig_dir, 'Ach_DRIVE_geneavg_compare.png'), width = 4., height = 4, dpi = 350)
+
+# temp <- gene_avgs %>% 
+#     filter(dset %in% c('GA_DRIVE', 'GA_Ach'), gene_type == 'essential') %>% 
+#     mutate(data_set = str_match(dset, '_(.+)')[,2],
+#            data_set = ifelse(data_set == 'Ach', 'Achilles', data_set)) 
+# ggplot(temp, aes(avg_score, fill = data_set)) + 
+#     geom_density(alpha = 0.5) +
+#     scale_fill_manual(values = data_type_pal) +
+#     xlab('Pop. avg. dependency') +
+#     ylab('Density') + 
+#     guides(color = guide_legend(title = element_blank()),
+#            fill = guide_legend(title = element_blank())) +
+#     theme_Publication()
+
+```
+
+## Ach_DRIVE bench cor compare
+```{r}
+mp <- with(bench_cors, max(max(abs(GA_Ach), na.rm=T), max(abs(GA_DRIVE), na.rm=T)))
+ggplot(bench_cors) + 
+    geom_point(aes(abs(GA_Ach), abs(GA_DRIVE)), alpha = 0.75) + 
+    geom_abline() +
+    xlab('Dep-feature correlation\nmagnitude (Achilles)') +
+    ylab('Dep-feature correlation\nmagnitude (DRIVE)') + 
+    xlim(0, mp) + ylim(0, mp) +
+    theme_Publication()
+ggsave(file.path(fig_dir, 'Ach_DRIVE_bench_compare.png'), width = 4, height = 4, dpi = 350)
+
+```
+

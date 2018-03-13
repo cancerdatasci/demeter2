@@ -1,0 +1,186 @@
+---
+title: "DRIVE, depMap compare "
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(plyr); library(magrittr); 
+library(reshape2)
+library(tibble)
+library(dplyr)
+library(taigr);
+library(ggplot2)
+library(ggrepel)
+library(dependr)
+library(readr)
+library(stringr)
+library(cowplot)
+library(weights)
+library(psych)
+library(knitr)
+library(cdsr)
+library(edgeR)
+library(limma)
+library(jmmBase)
+
+source('./benchmark_helpers.R')
+load('~/CPDS/data/CCLE/Annotations.RData')
+data_dir <- '~/CPDS/data/Achilles/shRNA/'
+
+#PARAMETERS
+prior_count <- 10
+```
+
+```{r}
+# DEFINE HELPER FUNCTIONS
+remove_from_list <- function(data, remove_list) {
+    #get rid of replicate samples in the remove list
+    to_remove <- colnames(data) %in% remove_list
+    print(sprintf('removing %d samples', sum(to_remove)))
+    return(data[, !to_remove])
+}
+
+get_pDNA_median <- function(data, min_pDNA = 1) {
+    #get pDNA median, and filter hairpins with too low pDNA
+    pDNA_samples <- grep('pdna', colnames(data), ignore.case = T, value=T)
+    pDNA_median <- apply(data[,pDNA_samples], 1, median, na.rm=T)
+    sufficient_pDNA <- pDNA_median >= min_pDNA
+    print(sprintf('%d/%d samples with insufficient pDNA', sum(!sufficient_pDNA), length(sufficient_pDNA)))
+    data <- data[sufficient_pDNA,]
+    pDNA_median <- pDNA_median[sufficient_pDNA]
+    data <- data[, !grepl('pdna', colnames(data), ignore.case = T)]
+    return(list(pDNA_median = pDNA_median, data = data))
+}
+
+subtract_pDNA_median <- function(data, pDNA_median) {
+    return(data - matrix(rep(pDNA_median, ncol(data)), nrow = nrow(data), ncol = ncol(data), byrow=F))
+}
+
+get_CL_names <- function(data) {
+    sample_CL <- str_match(colnames(data), '(.+)\\.(rep)')[,2]
+    bad_cols <- grepl('^[Xx][1-9]',sample_CL)
+    sample_CL[bad_cols] <- str_sub(sample_CL[bad_cols],2)
+    sample_CL %<>% str_replace('dv.90_2nd', 'dv.90')
+    sample_CL %<>% str_replace('dv.90', 'ls180') #name change for dv90
+    sample_CL[sample_CL == 'mutz.2'] <- 'OCIAML5_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE' #name change for MUTZ2
+    cleaned_CL_names <- CleanCellLineName(sample_CL)
+    # cleaned_CL_names <- cleaned_CL_names[!is.na(cleaned_CL_names)]
+    return(cleaned_CL_names)
+}
+
+get_rep_medians <- function(CL_names, data) {
+    rep_medians <- laply(unique(CL_names), function(CL) {
+        return(apply(data[,CL_names == CL], 1, median))
+    })
+    rownames(rep_medians) <- unique(CL_names)
+    return(rep_medians)
+}
+proc_names <- function(names) {
+    names <- tolower(names)
+    names <- str_replace_all(names, '  ', ' ')
+    return(make.names(names))
+}
+```
+
+
+Load Achilles 55k data
+```{r}
+counts_55k_1 <- read.gct(file.path(data_dir, 'cBOTv7_sbsv2_allreplicates_sums.gct'))
+counts_55k_2 <- read.gct(file.path(data_dir, 'cBOTv8_sbsv3_allreplicates_sums.gct'))
+colnames(counts_55k_1) <- proc_names(colnames(counts_55k_1))
+colnames(counts_55k_2) <- proc_names(colnames(counts_55k_2))
+remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1)
+
+counts_55k_1 %<>% remove_from_list(remove_list_55k)
+counts_55k_2 %<>% remove_from_list(remove_list_55k)
+```
+
+Load Achilles 98k data
+```{r}
+counts_98k <- read.csv(file.path(data_dir, 'Achilles98k_20150515_AllReplicates_20150515_rawReadCounts.csv'), row.names=1)
+colnames(counts_98k) <- proc_names(colnames(counts_98k))
+remove_list_98k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_98k.txt'), col_names = FALSE)$X1)
+counts_98k %<>% remove_from_list(remove_list_98k)
+```
+
+#get lcpm per batch 
+```{r}
+lcpm_55k_1 <- edgeR::cpm(counts_55k_1, normalized.lib.sizes = TRUE, log = TRUE, prior.count = prior_count)
+lcpm_55k_2 <- edgeR::cpm(counts_55k_2, normalized.lib.sizes = TRUE, log = TRUE, prior.count = prior_count)
+lcpm_98k <- edgeR::cpm(counts_98k, normalized.lib.sizes = TRUE, log = TRUE, prior.count = prior_count)
+```
+
+#get PDNA median per batch and subtract from samples
+```{r}
+new_data <- get_pDNA_median(lcpm_55k_1)
+lcpm_55k_1 <- new_data$data
+pDNA_med_55k_1 <- new_data$pDNA_median
+lcpm_55k_1 %<>% subtract_pDNA_median(pDNA_med_55k_1)
+    
+new_data <- get_pDNA_median(lcpm_55k_2)
+lcpm_55k_2 <- new_data$data
+pDNA_med_55k_2 <- new_data$pDNA_median
+lcpm_55k_2 %<>% subtract_pDNA_median(pDNA_med_55k_2)
+
+new_data <- get_pDNA_median(lcpm_98k)
+lcpm_98k <- new_data$data
+pDNA_med_98k <- new_data$pDNA_median
+lcpm_98k %<>% subtract_pDNA_median(pDNA_med_98k)
+```
+
+#Calculate rep medians
+```{r}
+lcpm_55k_1_CL_names <- get_CL_names(lcpm_55k_1)
+lcpm_55k_2_CL_names <- get_CL_names(lcpm_55k_2)
+lcpm_98k_CL_names <- get_CL_names(lcpm_98k)
+# lcpm_55k_1_nreps <- get_n_reps(lcpm_55k_1)
+# lcpm_55k_2_nreps <- get_n_reps(lcpm_55k_2)
+# lcpm_98k_nreps <- get_n_reps(lcpm_98k)
+
+lcpm_55k_1 <- get_rep_medians(lcpm_55k_1_CL_names, lcpm_55k_1)
+lcpm_55k_2 <- get_rep_medians(lcpm_55k_2_CL_names, lcpm_55k_2)
+lcpm_98k <- get_rep_medians(lcpm_98k_CL_names, lcpm_98k)
+```
+
+#transpose so rows are sh
+```{r}
+lcpm_55k_1 %<>% t()
+lcpm_55k_2 %<>% t()
+lcpm_98k %<>% t()
+```
+
+
+#merge data
+```{r}
+#first write out files for raw LFC data
+write.csv(lcpm_98k, file.path(data_dir, 'shRNA_98k_LFC.csv'))
+write.csv(lcpm_55k_1, file.path(data_dir, 'shRNA_55k_1_LFC.csv'))
+write.csv(lcpm_55k_2, file.path(data_dir, 'shRNA_55k_2_LFC.csv'))
+
+lcpm_55k <- join_all(list(
+    lcpm_55k_1 %>% as.data.frame() %>% rownames_to_column(var = 'SHRNA'),
+    lcpm_55k_2 %>% as.data.frame() %>% rownames_to_column(var = 'SHRNA')
+), by = 'SHRNA', type = 'full') %>% column_to_rownames(var = 'SHRNA')
+
+write.csv(lcpm_55k, file.path(data_dir, 'shRNA_55k_LFC.csv'))
+
+lcpm_combined <- join_all(list(
+    lcpm_55k %>% as.data.frame() %>% rownames_to_column(var = 'SHRNA'),
+    lcpm_98k %>% as.data.frame() %>% rownames_to_column(var = 'SHRNA')
+), by = 'SHRNA', type = 'full') %>% column_to_rownames(var = 'SHRNA')
+write.csv(lcpm_combined, file.path(data_dir, 'combined_shRNA_LFC.csv'))
+```
+
+
+<!-- ```{r} -->
+<!-- #Make quantile normalized version -->
+<!-- lcpm_quant <- t(limma::normalizeQuantiles(t(lcpm_combined))) -->
+<!-- write.csv(lcpm_quant, file.path(data_dir, 'combined_shRNA_LFC_quant.csv')) -->
+<!-- ``` -->
+
+
+

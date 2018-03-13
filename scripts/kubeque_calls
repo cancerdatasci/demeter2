@@ -1,0 +1,31 @@
+
+#--------------------------------------
+## HYPERPARAMETER SCANS
+#--------------------------------------
+#Run parameter scan for relative score L2 (Achilles)
+sparkles sub -n Ach_rel_scan --params ./params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/demeter2/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --xv_frac 0.1 --max_alt_iters 4 --gene_l2_lambda '{gene_L2}' --rel_gene_l2_lambda '{gene_rel_L2}' --seed_l2_lambda '{seed_L2}' --rel_seed_l2_lambda '{seed_rel_L2}' --hairpin_l2_lambda '{hp_offset_L2}' --hp_unpred_l2_lambda '{hp_unpred_L2}'
+
+
+#Run parameter scan for relative score L2 (DRIVE)
+sparkles sub -n DRIVE_rel_scan --params ./params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/demeter2/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name DRIVE --xv_frac 0.1 --max_alt_iters 4 --gene_l2_lambda '{gene_L2}' --rel_gene_l2_lambda '{gene_rel_L2}' --seed_l2_lambda '{seed_L2}' --rel_seed_l2_lambda '{seed_rel_L2}' --hairpin_l2_lambda '{hp_offset_L2}' --hp_unpred_l2_lambda '{hp_unpred_L2}'
+
+#ACHILLES ABS PARAM SCAN
+sparkles sub -n Ach_abs_scan --params ./abs_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/demeter2/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --max_alt_iters 4 --no_edward --save_perf_only --gene_l2_lambda '{gene_L2}' --rel_gene_l2_lambda '{gene_rel_L2}' --seed_l2_lambda '{seed_L2}' --rel_seed_l2_lambda '{seed_rel_L2}' --hairpin_l2_lambda '{hp_offset_L2}' --hp_unpred_l2_lambda '{hp_unpred_L2}'
+
+#--------------------------------------
+## SINGLE RUNS
+#--------------------------------------
+#Achilles
+sparkles sub --clean --loglive -n Ach_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Achilles 
+
+#DRIVE
+sparkles sub --clean --loglive -n DRIVE_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_DRIVE 
+
+#Marcotte
+sparkles sub --clean --loglive -n Marc_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Marc 
+
+#Combined
+sparkles sub --clean --loglive -n comb_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_comb 
+
+#Gene set xval
+sparkles sub -n Ach_gene_xval --params ./seed_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/demeter2/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --gene_xv_frac 0.5 --max_alt_iters 4 --no_edward --save_perf_only --random_seed '{random_seed}'

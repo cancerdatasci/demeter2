@@ -1,0 +1,54 @@
+########################### Running DEMETER1 on Achilles data ###########################
+
+cd /Users/zho/Documents/demeter
+
+# Create directory to store final results
+mkdir /Users/zho/Documents/RNAi\ Pipeline/Achilles/DEMETER1/final
+
+# Preprocess gct files for input to DEMETER1
+./preprocess-gcts ach_reformatted.Rdata ~/Documents/RNAi\ Pipeline/Achilles/DEMETER1/Achilles_batches.csv ~/Documents/RNAi\ Pipeline/Achilles/DEMETER1/Achilles_98k.gct,~/Documents/RNAi\ Pipeline/Achilles/DEMETER1/Achilles_55k_batch1.gct,~/Documents/RNAi\ Pipeline/Achilles/DEMETER1/Achilles_55k_batch2.gct
+
+# Run DEMETER1 with hyperparameters
+kubeque sub --fetch /Users/zho/Documents/RNAi\ Pipeline/Achilles/DEMETER1/final -u @kubeque/files \ Rscript ./eval-demeter-final --full.data.file '^ach_reformatted.Rdata' \
+      --dest.dir=. --learning.rate=0.005 --randseed=1 \
+      --G.S=1.67e-5 --alpha.beta.gamma=0.58 --max.num.iter=500
+
+
+########################### Running DEMETER1 on DRIVE data ###########################
+
+cd /Users/zho/Documents/demeter
+
+# Create directories to store results from DRIVE hyperparameter search
+
+mkdir /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed
+mkdir /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hpsearch
+
+# Preprocess gct files for input to DEMETER1
+./preprocess-gcts drive_reformatted.Rdata /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/DRIVE_batches.csv /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/DRIVE_mat.gct
+
+# Generate hyperparameter sets to test
+Rscript sample_drive_hyperparameters.R --output.file=/Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hyperparameter-samples.csv
+
+# Run hyperparameter search using kubeque
+kubeque sub --fetch /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hpsearch -u @kubeque/files \
+  --params /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hyperparameter-samples.csv \
+  Rscript ./eval-demeter --holdout.fold='{fold}' --config.index='{config.index}' \
+    --fold.count=5 --randseed=1 --G.S='{G.S}' --alpha.beta.gamma='{alpha.beta.gamma}' \
+    --full.data.file '^drive_reformatted.Rdata' --output.file=out.rds \
+    --learning.rate='{learning.rate}' --max.num.iter=500
+
+# Remove excess files generated with kubeque
+rm /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hpsearch/*/stdout.txt
+
+# Merge output from hyperparameter search to find best set to use
+./merge-eval-outputs /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hpsearch /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/processed/hpsearch-merged.rds
+
+# Create directory to store final results
+
+mkdir /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/final
+
+# Officially run DEMETER1 with hyperparameters
+
+kubeque sub --fetch /Users/zho/Documents/RNAi\ Pipeline/DRIVE/DEMETER1/final -u @kubeque/files \ Rscript ./eval-demeter-final --full.data.file '^drive_reformatted.Rdata' \
+      --dest.dir=. --learning.rate=5.0e-8 --randseed=1 \
+      --G.S=1.67e-5 --alpha.beta.gamma=0.58 --max.num.iter=500
