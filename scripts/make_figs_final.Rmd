@@ -350,10 +350,10 @@ for (cur_dset in names(dep_datasets)) {
 ```{r}
 #load CL data for Achilles and DRIVE
 Ach_CL_data <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F, check.names=F)
-Ach_CL_data %<>% mutate(CCLE_ID = revalue(new_name_map))
+Ach_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map))
 
 DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F, check.names = F)
-DRIVE_CL_data %<>% mutate(CCLE_ID = revalue(new_name_map))
+DRIVE_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map))
 
 ```
 
@@ -1969,9 +1969,9 @@ p3 <- ggplot(a_df, aes(D1_PC1, D1_PC2, fill = CL_m)) +
 
 # mylegend<-g_legend(p1)
 
-p <- arrangeGrob(p1 + theme(legend.position="none"),
-                         p2 + theme(legend.position="none"),
-                         p3 + theme(legend.position='none'),
+p <- arrangeGrob(p2 + theme(legend.position="none"),
+                         p3 + theme(legend.position="none"),
+                         p1 + theme(legend.position='none'),
                          nrow=1)
 # p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
 #                          p2 + theme(legend.position="none"),
