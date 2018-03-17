@@ -41,7 +41,7 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/figures'
+fig_dir <- '~/CPDS/demeter2/results/figures_lowreg'
 base_font <- 12 #font size for figs
 
 ###PARAMETERS
@@ -66,10 +66,10 @@ biomarker_res_cache_HOT_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_
 ###DATASETS USED
 base_data_dir <- '~/CPDS/demeter2/'
 dep_datasets <- list(
-    D2_DRIVE = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/DRIVE_final/1'), dataset = 'DRIVE', type = 'abs'),
-    D2_Ach = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Ach_final/1'), dataset = 'Ach', type = 'abs'),
+    D2_DRIVE = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/DRIVE_final_prev/1'), dataset = 'DRIVE', type = 'abs'),
+    D2_Ach = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Ach_lowreg/1'), dataset = 'Ach', type = 'abs'),
     D2_Marc = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Marc_final/1'), dataset = 'Marcotte', type = 'abs'),
-    D2_comb = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/comb_final/1'), dataset = 'DRIVE', type = 'abs'),
+    D2_comb = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/comb_final_prev/1'), dataset = 'DRIVE', type = 'abs'),
     D1_Marc = list(mod_type = 'D1', dataset = 'Marcotte', type = 'rel',
                    taiga_name = 'marcotte-demeter-z-scored-expanded-gene-sols-e905',
                    taiga_version = 10,
@@ -1027,7 +1027,7 @@ n_used_genes <- 2500
 cur_common_genes <- intersect(
     colnames(dep_data$D2_Ach$gene_scores),
     colnames(dep_data$D2_DRIVE$gene_scores)
-)
+) %>% intersect(colnames(dep_data$D1_Ach$gene_scores))
 high_var_genes <- gene_SDs %>% 
     filter(Gene %in% cur_common_genes, dset %in% c('D1_Ach', 'D1_DRIVE')) %>% 
     group_by(Gene) %>%
@@ -2851,18 +2851,17 @@ ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 4, height = 4, dpi = 350)
 ## S6 Scale param v doubling time
 ```{r}
 Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
-    left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv') %>% 
-                         mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)), stringsAsFactors = F) %>% 
+    left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv')) %>% 
+         mutate(CCLE_ID = revalue(CCLE_ID, new_name_map), stringsAsFactors = F) %>% 
     group_by(CCLE_ID) %>% 
     summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% 
     mutate(dset = 'Achilles')
 
 DRIVE_CL_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
-    left_join(read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv') %>% 
-                         mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)), stringsAsFactors = F) %>% 
+    left_join(read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
+             mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
     group_by(CCLE_ID) %>% 
-    summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% 
-    mutate(dset = 'DRIVE')
+    summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% mutate(dset = 'DRIVE')
 
 df <- rbind(Ach_CL_data, DRIVE_CL_data) %>% 
     left_join(

@@ -16,16 +16,16 @@ sparkles sub -n Ach_abs_scan --params ./abs_params.csv -u /Users/jmmcfarl/CPDS/d
 ## SINGLE RUNS
 #--------------------------------------
 #Achilles
-sparkles sub --clean --loglive -n Ach_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Achilles 
+sparkles sub --clean --loglive -n Ach_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Achilles 
 
 #DRIVE
-sparkles sub --clean --loglive -n DRIVE_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_DRIVE 
+sparkles sub --clean --loglive -n DRIVE_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_DRIVE 
 
 #Marcotte
-sparkles sub --clean --loglive -n Marc_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Marc 
+sparkles sub --clean --loglive -n Marc_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_Marc 
 
 #Combined
-sparkles sub --clean --loglive -n comb_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/demeter2/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_comb 
+sparkles sub --clean --loglive -n comb_final -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_files ./data/data_files_comb 
 
 #Gene set xval
-sparkles sub -n Ach_gene_xval --params ./seed_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/demeter2/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --gene_xv_frac 0.5 --max_alt_iters 4 --no_edward --save_perf_only --random_seed '{random_seed}'
+sparkles sub -n Ach_gene_xval --params ./seed_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --gene_xv_frac 0.5 --max_alt_iters 4 --no_edward --save_perf_only --random_seed '{random_seed}'

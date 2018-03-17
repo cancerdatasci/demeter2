@@ -942,7 +942,7 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
             return(data.frame())
         }
         all_cors <- ldply(target_dsets %>% set_names(target_dsets), function(dname) {
-            if (!(bench$Dep_Gene_ID %in% colnames(dep_data[[dname]]$gene_scores))) {
+           if (!(bench$Dep_Gene_ID %in% colnames(dep_data[[dname]]$gene_scores))) {
                 return(data.frame(cor = NA))
             }
             dep <- dep_data[[dname]]$gene_scores[, bench$Dep_Gene_ID]
@@ -963,9 +963,13 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
                   if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
                     inG <- cur_CLs[feature[cur_CLs] == 1]
                     outG <- cur_CLs[feature[cur_CLs] == 0]
-                    tres <- wtd.t.test(dep[inG], dep[outG], 
+                    if (length(inG) >= 2 & length(outG) >= 2) {
+                      tres <- wtd.t.test(dep[inG], dep[outG], 
                                     weight = 1/dep_SD[inG]^2, weighty = 1/dep_SD[outG]^2)
                     pvalue <- tres$coefficients[['p.value']]
+                    } else {
+                      pvalue <- NA
+                    }
                     ptype <- 'ttest'
                   }
                   res <- data.frame(cor = c[1, 'correlation'], p.value = pvalue, ptype = ptype)
@@ -975,8 +979,14 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
                 pvalue <- c$p.value
                 ptype <- 'cor'
                 if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
-                  tres <- t.test(dep[inG], dep[outG])
-                  pvalue <- tres$p.value
+                  inG <- cur_CLs[feature[cur_CLs] == 1]
+                  outG <- cur_CLs[feature[cur_CLs] == 0] 
+                  if (length(inG) >= 2 & length(outG) >= 2) {
+                    tres <- t.test(dep[inG], dep[outG])
+                    pvalue <- tres$p.value
+                  } else {
+                    pvalue <- NA
+                  }
                   ptype <- 'ttest'
                 }
                 res <- data.frame(cor = c$estimate, p.value = pvalue, ptype = ptype)

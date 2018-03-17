@@ -60,7 +60,7 @@ parser.add_argument("--gene_l2_lambda", type = float,
 parser.add_argument("--seed_l2_lambda", type = float, 
 	help="l2 penalty on (avg) seed scores", default = 1.0) 
 parser.add_argument("--rel_gene_l2_lambda", type = float, 
-    help="l2 penalty on relative gene scores", default = 1.0) 
+    help="l2 penalty on relative gene scores", default = 0.5) 
 parser.add_argument("--rel_seed_l2_lambda", type = float, 
 	help="l2 penalty on relative seed scores", default = 2.0) 
 parser.add_argument("--hairpin_l2_lambda", type = float, 
