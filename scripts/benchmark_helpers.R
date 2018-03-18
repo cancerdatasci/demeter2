@@ -537,7 +537,8 @@ clean_CL_names_with_missing <- function(CL_names) {
     return(new_names)
 }
 
-load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include_gene_families = FALSE, use_bayes=TRUE) {
+
+load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include_gene_families = FALSE, use_bayes=TRUE, name_map = NULL) {
     dep_data <- lapply(dep_dnames, function(dep_name) {
         print(sprintf('Loading %s', dep_name))
         cur_dep_info <- dep_datasets[[dep_name]]
@@ -644,6 +645,14 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
         if (cur_dep_info$mod_type == 'D2' & use_bayes) {
             cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,!grepl('XLOC', colnames(cur_dep_info$gene_score_SDs))]
         }
+        
+        if (!is.null(name_map)) {
+          rownames(cur_dep_info$gene_scores) %<>% plyr::revalue(name_map)
+          if (!is.null(cur_dep_info$gene_score_SDs)) {
+            rownames(cur_dep_info$gene_score_SDs) %<>% plyr::revalue(name_map)
+          }
+        }
+        cur_dep_info$mod <- NULL
         return(cur_dep_info)
     })
     return(dep_data)

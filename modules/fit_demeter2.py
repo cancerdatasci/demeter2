@@ -120,23 +120,22 @@ def get_dset(input_info):
 dsets = [get_dset(x) for ii, x in input_data.iterrows()]
 print('Read {} data files'.format(len(dsets)))
 
-if os.path.exists(args.sh_targets):
+if (args.sh_targets is not None) and os.path.exists(args.sh_targets):
     sh_targets = pd.read_csv(args.sh_targets)
 else:
-    sh_targets = tc.get(name='gpp-shrna-mapping-8759', version=1, file='CP1175_20171102_19mer')
+    sh_targets = tc.get(name='gpp-shrna-mapping-8759', version=2, file='shmap_19mer_noXLOC')
 sh_targets.rename(columns = {'Barcode Sequence': 'SEQ', 'Gene ID': 'Gene_ID'}, inplace=True)
 
 sh_targets.dropna(subset = ['Gene_ID'], inplace=True)
-sh_targets['Gene_ID'] = sh_targets['Gene_ID'].astype(int).astype(str)
 
 #load curated pos and negative control gene sets
 print('Loading positive/negative control sets')
 #load Entrez IDs for pos and neg con genes
-if os.path.exists(args.pos_cons):
+if (args.pos_cons is not None) and os.path.exists(args.pos_cons):
     pos_con_genes = pd.read_csv(args.pos_cons)['Gene_ID'].values
 else:
     pos_con_genes = tc.get(name='demeter2-pos-neg-controls-a5c6', version=1, file='hart_pos_controls')['Gene_ID'].values
-if os.path.exists(args.neg_cons):
+if (args.neg_cons is not None) and os.path.exists(args.neg_cons):
     neg_con_genes = pd.read_csv(args.neg_cons)['Gene_ID'].values
 else:
     neg_con_genes = tc.get(name='demeter2-pos-neg-controls-a5c6', version=1, file='hart_neg_controls')['Gene_ID'].values
