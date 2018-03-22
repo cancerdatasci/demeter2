@@ -6,14 +6,17 @@
 # so they can be accessed from any script that calls source('~/Documents/demeter2/scripts/pull_data.R')
 
 # This location must be changed
-base <- '/Users/zho/Desktop/' # Base for storing RNAi pipeline--this should be an existing location
+base <- '/Users/zho/Desktop/' # Base for storing RNAi pipeline
+
+# Downloaded raw DRIVE file from https://data.mendeley.com/datasets/y3ds55n88r/4
+path_to_DRIVE_counts <- '/Users/zho/Desktop/rnai_pipeline/DRIVE/DriveCountData.RDS'
 
 # Batch names
 Achilles_batch_names <- c('98k', '55k_batch1', '55k_batch2')
 DRIVE_batch_names <- c('BGPD', 'poolA', 'poolB')
 
 # Directory structure for the pipeline
-root <- paste0(base, 'rnai_pipeline/')
+root <- paste0(base, 'other_models/')
 
 # Make directories--everything is based on the root
 datatypes <- c('Achilles', 'DRIVE', 'Marcotte', 'Combined')
@@ -47,7 +50,7 @@ for (datatype in c('Achilles', 'DRIVE')) {
 paths$DRIVE_LFC_directory <- paste0(paths$DRIVE_directory, 'LFC/') # DRIVE LFC directory
 
 # Raw DRIVE file, downloaded from https://data.mendeley.com/datasets/y3ds55n88r/4
-paths$DRIVE_counts_fname <- paste0(paths$DRIVE_directory, 'DriveCountData.RDS')
+paths$DRIVE_counts_fname <- path_to_DRIVE_counts
 
 # Intermediate replicate median-collapsed DRIVE counts
 paths$rep_medians_fname <- paste0(paths$DRIVE_directory, 'replicate_counts.Rds')

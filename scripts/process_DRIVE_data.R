@@ -10,29 +10,36 @@ library(readr)
 library(stringr)
 library(edgeR)
 
-source('~/Documents/demeter2/scripts/pull_data.R')
+source('~/Documents/github/demeter2/scripts/setup_filesystem.R')
 
 # Process DRIVE Data for the pipeline. From raw counts to LFC estimate per hairpin/CL/batch.
-
-DRIVE_df <- read_rds(DRIVE_counts_fname)
+DRIVE_df <- read_rds(paths$DRIVE_counts_fname)
 
 # Quality Control: remove all CLEANNAME f36p entries because it has an abnormally large number
 # of sample counts that equal zero.
-
 DRIVE_df %<>% filter(CLEANNAME != 'f36p')
 
-exp_info <- DRIVE_df %>% dplyr::select(EXPERIMENT_ID, POOL, CLEANNAME) %>% unique()
-exp_info$CCLE_ID <- ifelse(is.na(CleanCellLineName(exp_info$CLEANNAME)), exp_info$CLEANNAME, CleanCellLineName(exp_info$CLEANNAME))
-hp_info <- DRIVE_df %>% dplyr::select(SHRNA_ID, SEQ) %>% unique()
+exp_info <- DRIVE_df %>% 
+  dplyr::select(EXPERIMENT_ID, POOL, CLEANNAME) %>% 
+  unique()
 
-# Get hairpin map
-get_hairpin_map()
+exp_info$CCLE_ID <- ifelse(is.na(CleanCellLineName(exp_info$CLEANNAME)), 
+                           exp_info$CLEANNAME, 
+                           CleanCellLineName(exp_info$CLEANNAME))
+
+hp_info <- DRIVE_df %>% 
+  dplyr::select(SHRNA_ID, SEQ) %>% 
+  unique()
+
+# Another update for cell line names in DRIVE
+new_name_table <- read.csv('~/Documents/demeter2/name_change_map.csv', check.names = FALSE, stringsAsFactors = FALSE)
+new_name_map <- new_name_table$new_name %>% set_names(new_name_table$old_name)
 
 prior_count <- 10
 plasmid_threshold <- 20000000
 
 LFCs <- DRIVE_df %>% dlply(.(POOL), function(df) {
-  print(df$POOL %>% unique())
+  
   PLASMID_counts <- acast(df, SHRNA_ID ~ EXPERIMENT_ID, value.var = 'PLASMID_COUNT')
   SAMPLE_counts <- acast(df, SHRNA_ID ~ EXPERIMENT_ID, value.var = 'SAMPLE_COUNT')
   
@@ -52,12 +59,22 @@ LFCs <- DRIVE_df %>% dlply(.(POOL), function(df) {
 
   LFC[PLASMID_lcpm < 1] <- NA # remove shRNAs with < 1 log plasmid counts per million
   
-  long <- melt(LFC) %>% set_colnames(c('SHRNA_ID', 'EXPERIMENT_ID', 'LFC')) %>% left_join(exp_info, by = 'EXPERIMENT_ID') %>% left_join(hp_info, by = 'SHRNA_ID')
+  long <- melt(LFC) %>% 
+    set_colnames(c('SHRNA_ID', 'EXPERIMENT_ID', 'LFC')) %>% 
+    left_join(exp_info, by = 'EXPERIMENT_ID') %>% 
+    left_join(hp_info, by = 'SHRNA_ID')
+  
   # Median collapse replicates in two dimensions
   # 1. EXPERIMENT_IDs with the same POOL/CL combination
   # 2. SHRNA_IDs with the same SEQ
-  rep_medians <- long %>% group_by(POOL, CCLE_ID, SEQ) %>% dplyr::summarise(median_LFC = median(LFC, na.rm = T))
+  rep_medians <- long %>% 
+    group_by(POOL, CCLE_ID, SEQ) %>% 
+    dplyr::summarise(median_LFC = median(LFC, na.rm = T))
   median_LFC_mat <- rep_medians %>% acast(SEQ ~ CCLE_ID)
-  write.csv(as.data.frame(median_LFC_mat), paste0(DRIVE_LFC_directory, unique(long$POOL), '_LFC_mat.csv'))
+  
+  # update colnames in drive
+  colnames(median_LFC_mat) %<>% plyr::revalue(new_name_map)
+  
+  write.csv(as.data.frame(median_LFC_mat), paste0(paths$DRIVE_LFC_directory, unique(long$POOL), '_LFC_mat.csv'))
   return(median_LFC_mat)
 })
