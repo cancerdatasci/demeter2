@@ -1,8 +1,8 @@
 library(readr)
 library(weights)
 library(magrittr)
-input_cache_file <- './temp_input_cache.rds'
-output_res_file <- './temp_output_cache.rds'
+input_cache_file <- '~/CPDS/demeter2/results/temp_input_cache.rds'
+output_res_file <- '~/CPDS/demeter2/results/temp_output_cache.rds'
 
 inputs <- read_rds(input_cache_file)
 res <- ldply(inputs$genes, function(gene) {

@@ -825,7 +825,7 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
 
         #isolate this part in separate script to avoid memory issues with foreach parallelization
         write_rds(inputs, input_cache_file)
-        source('~/CPDS/demeter2/scripts/get_cors_internal.R')
+        source('~/CPDS/packages/demeter2_pub/scripts/get_cors_internal.R')
         cur_res <- read_rds(output_res_file)
 
         full_res %<>% rbind(cur_res)
@@ -837,11 +837,9 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
 
     full_res %<>% filter(!is.na(feat_gene)) %>%
         mutate(feat_gene = as.character(feat_gene),
-               targ_gene = as.character(targ_gene)) %>%
-        mutate(feat_sym = as.vector(IDs_to_symbols[feat_gene]),
-               targ_sym = as.vector(IDs_to_symbols[targ_gene]))
+               targ_gene = as.character(targ_gene))
 
-    full_res %<>% left_join(related_genes, by = c('feat_sym' = 'partner', 'targ_sym' = 'target'))
+    full_res %<>% left_join(related_genes, by = c('feat_gene' = 'partner_ID', 'targ_gene' = 'target_ID'))
 
     full_res %<>% mutate(source = ifelse(feat_gene == targ_gene, 'same', source))
     return(full_res)
@@ -858,18 +856,6 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
     # return(rel_an)
 }
 
-
-
-LRT_test <- function(vec) {
-    library(MASS); library(sn)
-    vec <- vec[!is.na(vec)]
-    st_LL <- data.frame(data = vec) %>%
-        selm(data ~ 1, family = "ST", data = .) %>%
-        logLik %>%
-        as.numeric()
-    n_LL <- fitdistr(vec, 'normal')$loglik
-    return(2*(st_LL - n_LL))
-}
 
 get_gene_avgs <- function(dep_data, target_dsets, pos_cons, neg_cons, use_bayes = TRUE) {
     ## Calcultate per-gene averages for set of models

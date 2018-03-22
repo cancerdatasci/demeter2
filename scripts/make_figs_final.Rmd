@@ -41,7 +41,7 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/figures_lowreg'
+fig_dir <- '~/CPDS/demeter2/results/figures_oldreg'
 base_font <- 12 #font size for figs
 
 ###PARAMETERS
@@ -66,44 +66,44 @@ biomarker_res_cache_HOT_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_
 ###DATASETS USED
 base_data_dir <- '~/CPDS/demeter2/'
 dep_datasets <- list(
-    D2_DRIVE = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/DRIVE_final_prev/1'), dataset = 'DRIVE', type = 'abs'),
-    D2_Ach = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Ach_lowreg/1'), dataset = 'Ach', type = 'abs'),
+    D2_DRIVE = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/DRIVE_final/1'), dataset = 'DRIVE', type = 'abs'),
+    D2_Ach = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Ach_final/1'), dataset = 'Ach', type = 'abs'),
     D2_Marc = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/Marc_final/1'), dataset = 'Marcotte', type = 'abs'),
-    D2_comb = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/comb_final_prev/1'), dataset = 'DRIVE', type = 'abs'),
+    D2_comb = list(mod_type = 'D2', path = file.path(base_data_dir, 'kube_results/comb_final/1'), dataset = 'DRIVE', type = 'abs'),
     D1_Marc = list(mod_type = 'D1', dataset = 'Marcotte', type = 'rel',
                    taiga_name = 'marcotte-demeter-z-scored-expanded-gene-sols-e905',
-                   taiga_version = 10,
+                   taiga_version = 11,
                    taiga_file = 'ExpandedGeneZSolsCleaned'),
     D1_Ach = list(mod_type = 'D1', dataset = 'Ach', type = 'rel',
                    taiga_name = 'achilles-demeter-1-scores-3de4',
-                   taiga_version = 2),
+                   taiga_version = 3),
     D1_DRIVE = list(mod_type = 'D1', dataset = 'DRIVE', type = 'rel',
                    taiga_name = 'drive-demeter-1-scores-e811',
-                   taiga_version = 4),
+                   taiga_version = 5),
     ATARiS_Ach = list(mod_type = 'ATARiS', dataset = 'Ach', type = 'rel',
                       taiga_name = 'achilles-ataris-scores-12c6', 
-                      taiga_version = 4),
+                      taiga_version = 5),
     ATARiS_DRIVE = list(mod_type = 'ATARiS', dataset = 'DRIVE', type = 'rel',
                       taiga_name = 'drive-ataris-scores-1988', 
                       taiga_version = 5),
     GA_Ach = list(mod_type = 'GA', dataset = 'Ach', type = 'abs',
                    taiga_name = 'achilles-gene-averaging-matrices-608b',
-                   taiga_version = 9),
+                   taiga_version = 10),
     GA_DRIVE = list(mod_type = 'GA', dataset = 'DRIVE', type = 'abs',
                    taiga_name = 'drive-gene-averaging-matrices-d967',
-                   taiga_version = 11),
+                   taiga_version = 12),
     GA_Marc = list(mod_type = 'GA', dataset = 'Marcotte', type = 'abs',
                    taiga_name = 'marcotte-gene-averaging-matrix-6bcb',
-                   taiga_version = 3),
+                   taiga_version = 5),
     GA_comb = list(mod_type = 'GA', dataset = 'comb', type = 'abs',
                taiga_name = 'gene-average-9c95',
-               taiga_version = 7),
+               taiga_version = 8),
     RSA_Ach = list(mod_type = 'RSA', dataset = 'Ach', type = 'abs',
                    taiga_name = 'achilles-rsa-scores-855d',
-                   taiga_version = 4),
+                   taiga_version = 5),
     RSA_DRIVE = list(mod_type = 'RSA', dataset = 'DRIVE', type = 'abs',
                    taiga_name = 'drive-rsa-scores-f57d',
-                   taiga_version = 8),
+                   taiga_version = 9),
     CERES_CRISPR = list(mod_type = 'CERES', dataset = 'CRISPR', type = 'abs',
                  taiga_name = 'avana-public-tentative-18q1-92d9',
                  taiga_version = 5,
@@ -133,7 +133,12 @@ Gene_ID_to_symb <- sh_targets %>%
 Gene_ID_to_symb <- Gene_ID_to_symb$`Gene Symbol` %>% set_names(Gene_ID_to_symb$`Gene ID`)
 Gene_symb_to_ID <- names(Gene_ID_to_symb) %>% set_names(Gene_ID_to_symb)
 
-related_genes <- load.from.taiga(data.name='related-features-dcbd', data.version=2)
+related_genes <- load.from.taiga(data.name='related-features-dcbd', data.version=4) %>% 
+  mutate(target_ID = str_match(target, '\\((.+)\\)')[,2],
+         partner_ID = str_match(partner, '\\((.+)\\)')[,2],
+         target = str_match(target, '(.+) \\(')[,2],
+         partner = str_match(partner, '(.+) \\(')[,2]
+         )
 
 CRISPR_benchmarks <- read.csv('~/CPDS/demeter2/results/top_CRISPR_biomarkers.csv', stringsAsFactors = F, check.names = F) %>% 
     mutate()
@@ -166,6 +171,20 @@ if (colnames(dep_data$D1_Marc$gene_scores)[1] %in% sh_targets$`Gene Symbol`) {
     colnames(dep_data$D1_Marc$gene_scores) <- Gene_symb_to_ID[colnames(dep_data$D1_Marc$gene_scores)]
 }
 ```
+
+```{r}
+#make sure all Marcotte cell names have consistent CCLE_ID formatting
+old_Marc_names <- rownames(dep_data$GA_Marc$gene_scores)
+new_Marc_names <- old_Marc_names
+new_Marc_names[!grepl('BREAST', new_Marc_names)] <- paste0(new_Marc_names[!grepl('BREAST', new_Marc_names)], '_BREAST')
+Marc_name_map <- new_Marc_names %>% set_names(old_Marc_names)
+for (dname in names(dep_data)) {
+    if (dep_data[[dname]]$mod_type != 'D2') {
+        rownames(dep_data[[dname]]$gene_scores) %<>% plyr::revalue(Marc_name_map, warn_missing = FALSE)
+    }
+}
+```
+
 
 ```{r}
 #calculate hairpins per gene stats per dataset
@@ -306,12 +325,6 @@ dep_data$D1_merge <- list(type = 'rel', mod_type = 'D1',
                          gene_scores = as.matrix(D1_merge))
 ```
 
-```{r, include = FALSE}
-#make consistent naming for CLs in Marcotte dataset
-Marc_CLs <- str_match(rownames(dep_data$D2_Marc$gene_scores), '(.+)_')[,2]
-rownames(dep_data$D1_merge$gene_scores)[rownames(dep_data$D1_merge$gene_scores) %in% Marc_CLs] <- paste0(rownames(dep_data$D1_merge$gene_scores)[rownames(dep_data$D1_merge$gene_scores) %in% Marc_CLs], '_BREAST')
-rownames(dep_data$GA_comb$gene_scores)[rownames(dep_data$GA_comb$gene_scores) %in% Marc_CLs] <- paste0(rownames(dep_data$GA_comb$gene_scores)[rownames(dep_data$GA_comb$gene_scores) %in% Marc_CLs], '_BREAST')
-```
 
 
 
@@ -350,10 +363,10 @@ for (cur_dset in names(dep_datasets)) {
 ```{r}
 #load CL data for Achilles and DRIVE
 Ach_CL_data <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F, check.names=F)
-Ach_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map))
+Ach_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
 
 DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F, check.names = F)
-DRIVE_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map))
+DRIVE_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
 
 ```
 
@@ -696,7 +709,6 @@ p2 <- make_CL_vs_avg_plot(dep_name, test_CLs, gene_avgs) +
     scale_y_continuous(breaks = c(-2,-1,0)) +
     theme_Publication(base_font) 
 
-
 mylegend<-g_legend(p1)
 
 p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
@@ -748,8 +760,12 @@ ggplot(df, aes(AGO2_GE)) +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication(base_font)
 ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 4, height = 3.5, dpi = 350)
-with(df, cor.test(AGO2_GE, Ach_GA_ssmd))
-with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd))
+
+print('AGO2-SSMD cor Achilles')
+print(with(df, cor.test(AGO2_GE, Ach_GA_ssmd)))
+
+print('AGO2-SSMD cor DRIVE')
+print(with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd)))
 
 ggplot(df, aes(AGO2_GE)) + 
     ylab('Common-essential\nmedian dependency') +
@@ -918,8 +934,7 @@ q_gene_ID <- Gene_symb_to_ID[q_gene]
 
 cur_related_genes <- related_genes %>% 
     filter(target == q_gene, source == 'CORUM') %>% 
-    .[['partner']] %>% 
-    Gene_symb_to_ID[.]
+    .[['partner_ID']] 
 
 df <- data.frame(Gene = colnames(c_D1), 
                  GA_c = c_GA[q_gene_ID,],
@@ -1408,8 +1423,11 @@ g1 <- ggplot(to_plot, aes(CN, D1, fill = `Screen signal`)) +
     #                 format(cor(to_plot$CN, to_plot$D1, use = 'pairwise.complete.obs'), digits = 3),
     #                  format(cor(to_plot$`Screen signal`, to_plot$D1, use = 'pairwise.complete.obs'), digits = 3))) 
 
-with(to_plot, cor.test(`Screen signal`, D1, use = 'pairwise.complete.obs'))
-with(to_plot, cor.test(CN, D1, use = 'pairwise.complete.obs'))
+print('D1-screen signal cor')
+print(with(to_plot, cor.test(`Screen signal`, D1, use = 'pairwise.complete.obs')))
+
+print('D1 CN cor')
+print(with(to_plot, cor.test(CN, D1, use = 'pairwise.complete.obs')))
 
 
 g2 <- ggplot(to_plot, aes(CN, D2, fill = `Screen signal`)) + 
@@ -1424,8 +1442,11 @@ g2 <- ggplot(to_plot, aes(CN, D2, fill = `Screen signal`)) +
     #                 format(cor(to_plot$CN, to_plot$D2, use = 'pairwise.complete.obs'), digits = 3),
     #                 format(cor(to_plot$`Screen signal`, to_plot$D2, use = 'pairwise.complete.obs'), digits = 3)))
     
-with(to_plot, cor.test(`Screen signal`, D2, use = 'pairwise.complete.obs'))
-with(to_plot, cor.test(CN, D2, use = 'pairwise.complete.obs'))
+print('D2 screen signal cor')
+print(with(to_plot, cor.test(`Screen signal`, D2, use = 'pairwise.complete.obs')))
+
+print('D2 CN cor')
+print(with(to_plot, cor.test(CN, D2, use = 'pairwise.complete.obs')))
 
 mylegend<-g_legend(g1)
 
@@ -1460,11 +1481,20 @@ bench_p <- bench_res %>%
 ```
 
 ```{r}
+print('Achilles')
+print('Wilcox test |D2| |D1|')
 with(bench_cors, wilcox.test(abs(D2_Ach), abs(D1_Ach), paired = TRUE))
+
+print('Num used D2/D1 compare')
 with(bench_cors, sum(!is.na(D2_Ach) & !is.na(D1_Ach)))
+
+print('Median D2 vs D1 improvement (%)')
 with(bench_cors, median(abs(D2_Ach) - abs(D1_Ach)/abs(D1_Ach), na.rm=TRUE))
 
+print('DRIVE')
+print('Wilcox test |D2| |D1|')
 with(bench_cors, wilcox.test(abs(D2_DRIVE), abs(D1_DRIVE), paired = TRUE))
+print('Num used D2/D1 compare')
 with(bench_cors, sum(!is.na(D2_DRIVE) & !is.na(D1_DRIVE)))
 
 ```
@@ -1647,6 +1677,7 @@ ggplot(unc_df, aes(ssmd, avg_sd)) +
     xlab('Cell line screen quality\n(GA model SSMD)') +
     theme_Publication(base_font)
 
+print('Avg_SD vs gene_slope cor')
 with(avg_unc, cor.test(avg_sd, gene_slope, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
@@ -1659,6 +1690,7 @@ ggplot(unc_df, aes(rep_cor, avg_sd)) +
     xlab('Avg. replicate correlation') +
     theme_Publication(base_font)
 
+print('Avg_SD vs rep_cor cor')
 with(unc_df, cor.test(avg_sd, rep_cor, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'repcor_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
@@ -1716,9 +1748,17 @@ CRISPR_cors_with_unc %<>% left_join(gene_avgs %>%
 CRISPR_cors_unc_spread <- CRISPR_cors_with_unc %>% 
     dplyr::select(Gene, cor, dset) %>% 
   spread(dset, cor)
+
+print('Achilles')
+print('Wilcox test D2_nounc vs D2_Ach')
 with(CRISPR_cors_unc_spread, wilcox.test(D2noUnc_Ach, D2_Ach, paired = TRUE))
+print('N_used')
 with(CRISPR_cors_unc_spread, sum(!is.na(D2noUnc_Ach) & !is.na(D2_Ach)))
+
+print('DRIVE')
+print('Wilcox test D2_nounc vs D2_Ach')
 with(CRISPR_cors_unc_spread, wilcox.test(D2noUnc_DRIVE, D2_DRIVE, paired = TRUE))
+print('N_used')
 with(CRISPR_cors_unc_spread, sum(!is.na(D2noUnc_DRIVE) & !is.na(D2_DRIVE)))
 
 p1 <- ggplot(CRISPR_cors_with_unc %>% filter(grepl('Ach', dset)) %>% 
@@ -1892,6 +1932,13 @@ D1_pcs <- pcaMethods::pca(dep_data$D1_merge$gene_scores,
 D1_R2sum <- R2cum(D1_pcs)
 D1_pcs <- scores(D1_pcs)
 
+print('D2 R2 sum')
+print(D2_R2sum)
+print('D1 R2 sum')
+print(D1_R2sum)
+print('GA R2 sum')
+print(GA_R2sum)
+
 
 a_df <- data.frame(CCLE_ID = rownames(dep_data$D2_comb$gene_scores), 
                    D2_PC1 = D2_pcs[,1], 
@@ -1906,7 +1953,8 @@ a_df <- data.frame(CCLE_ID = rownames(dep_data$D2_comb$gene_scores),
       CCLE_ID = rownames(dep_data$D1_merge$gene_scores), 
                    D1_PC1 = D1_pcs[,1], 
                    D1_PC2 = D1_pcs[,2]  
-    ), by = 'CCLE_ID') 
+    ), by = 'CCLE_ID') %>% 
+  mutate(CCLE_ID = as.character(CCLE_ID))
 # a_df %<>% left_join(CL_ann, by ='CCLE_ID')
 
 Ach_batch_info <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
@@ -1982,55 +2030,55 @@ p <- arrangeGrob(p2 + theme(legend.position="none"),
 ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 9.5, height = 3.5, dpi = 350)
 ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 9.5, height = 3.5, device = cairo_pdf())
 
-#QUANTIFY structure in PCs related to batch
-a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
-                 in_DRIVE = CCLE_ID %in% rownames(dep_data$D2_DRIVE$gene_scores),
-                 in_Marc = CCLE_ID %in% rownames(dep_data$D2_Marc$gene_scores))
-
-GA_PC1_sum <- summary(lm(GA_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-GA_PC2_sum <- summary(lm(GA_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D1_PC1_sum <- summary(lm(D1_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D1_PC2_sum <- summary(lm(D1_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D2_PC1_sum <- summary(lm(D2_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D2_PC2_sum <- summary(lm(D2_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-lm_sum <- c(GA_PC1 = GA_PC1_sum$r.squared,
-            GA_PC2 = GA_PC2_sum$r.squared,
-            D1_PC1 = D1_PC1_sum$r.squared,
-            D1_PC2 = D1_PC2_sum$r.squared,
-            D2_PC1 = D2_PC1_sum$r.squared,
-            D2_PC2 = D2_PC2_sum$r.squared)
-lm_sum <- data.frame(type = names(lm_sum), r_squared = lm_sum) 
-
-GA_PC1_sum <- summary(lm(abs(GA_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-GA_PC2_sum <- summary(lm(abs(GA_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D1_PC1_sum <- summary(lm(abs(D1_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D1_PC2_sum <- summary(lm(abs(D1_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D2_PC1_sum <- summary(lm(abs(D2_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-D2_PC2_sum <- summary(lm(abs(D2_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-lm_abs_sum <- c(GA_PC1_mag = GA_PC1_sum$r.squared,
-            GA_PC2_mag = GA_PC2_sum$r.squared,
-            D1_PC1_mag = D1_PC1_sum$r.squared,
-            D1_PC2_mag = D1_PC2_sum$r.squared,
-            D2_PC1_mag = D2_PC1_sum$r.squared,
-            D2_PC2_mag = D2_PC2_sum$r.squared)
-lm_abs_sum <- data.frame(type = names(lm_abs_sum), r_squared = lm_abs_sum) 
-
-lm_tot <- rbind(lm_sum, lm_abs_sum) %>% 
-    mutate(dset = str_match(type, '([:alnum:]+)_')[,2],
-           name = str_match(type, '(.+_PC[12])')[,2],
-           abs = grepl('mag', type),
-           type = as.vector(type),
-           abs = ifelse(abs, 'PC Magnitude', 'PC'))
-ggplot(lm_tot, aes(x=name, y=r_squared, group = dset, fill = dset)) +
-    geom_bar(stat='identity') +
-    ylab('Batch R2') +
-    xlab('') +
-    facet_wrap(~abs, ncol=1) + 
-    theme_Publication() +
-    scale_fill_manual(values = mod_type_pal) +
-    theme(axis.text.x=element_text(angle=90, hjust=1)) 
-
-ggsave(file.path(fig_dir, 'PCA_R2.png'), width = 4, height = 5, dpi = 350)
+# #QUANTIFY structure in PCs related to batch
+# a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
+#                  in_DRIVE = CCLE_ID %in% rownames(dep_data$D2_DRIVE$gene_scores),
+#                  in_Marc = CCLE_ID %in% rownames(dep_data$D2_Marc$gene_scores))
+# 
+# GA_PC1_sum <- summary(lm(GA_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# GA_PC2_sum <- summary(lm(GA_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D1_PC1_sum <- summary(lm(D1_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D1_PC2_sum <- summary(lm(D1_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D2_PC1_sum <- summary(lm(D2_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D2_PC2_sum <- summary(lm(D2_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# lm_sum <- c(GA_PC1 = GA_PC1_sum$r.squared,
+#             GA_PC2 = GA_PC2_sum$r.squared,
+#             D1_PC1 = D1_PC1_sum$r.squared,
+#             D1_PC2 = D1_PC2_sum$r.squared,
+#             D2_PC1 = D2_PC1_sum$r.squared,
+#             D2_PC2 = D2_PC2_sum$r.squared)
+# lm_sum <- data.frame(type = names(lm_sum), r_squared = lm_sum) 
+# 
+# GA_PC1_sum <- summary(lm(abs(GA_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# GA_PC2_sum <- summary(lm(abs(GA_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D1_PC1_sum <- summary(lm(abs(D1_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D1_PC2_sum <- summary(lm(abs(D1_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D2_PC1_sum <- summary(lm(abs(D2_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# D2_PC2_sum <- summary(lm(abs(D2_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
+# lm_abs_sum <- c(GA_PC1_mag = GA_PC1_sum$r.squared,
+#             GA_PC2_mag = GA_PC2_sum$r.squared,
+#             D1_PC1_mag = D1_PC1_sum$r.squared,
+#             D1_PC2_mag = D1_PC2_sum$r.squared,
+#             D2_PC1_mag = D2_PC1_sum$r.squared,
+#             D2_PC2_mag = D2_PC2_sum$r.squared)
+# lm_abs_sum <- data.frame(type = names(lm_abs_sum), r_squared = lm_abs_sum) 
+# 
+# lm_tot <- rbind(lm_sum, lm_abs_sum) %>% 
+#     mutate(dset = str_match(type, '([:alnum:]+)_')[,2],
+#            name = str_match(type, '(.+_PC[12])')[,2],
+#            abs = grepl('mag', type),
+#            type = as.vector(type),
+#            abs = ifelse(abs, 'PC Magnitude', 'PC'))
+# ggplot(lm_tot, aes(x=name, y=r_squared, group = dset, fill = dset)) +
+#     geom_bar(stat='identity') +
+#     ylab('Batch R2') +
+#     xlab('') +
+#     facet_wrap(~abs, ncol=1) + 
+#     theme_Publication() +
+#     scale_fill_manual(values = mod_type_pal) +
+#     theme(axis.text.x=element_text(angle=90, hjust=1)) 
+# 
+# ggsave(file.path(fig_dir, 'PCA_R2.png'), width = 4, height = 5, dpi = 350)
 
 ```
 
@@ -2146,8 +2194,15 @@ CRISPR_cors_spread <- CRISPR_cors %>%
   dplyr::select(Gene, cor, dset) %>% 
   spread(dset, cor)
 
+print('Wilcox test D2 comb vs D2 Ach')
 with(CRISPR_cors_spread, wilcox.test(D2_comb, D2_Ach, paired = TRUE))
+print('N_used')
+with(CRISPR_cors_spread, sum(!is.na(D2_comb) & !is.na(D2_Ach)))
+
+print('Wilcox test D2 comb vs D2 DRIVE')
 with(CRISPR_cors_spread, wilcox.test(D2_comb, D2_DRIVE, paired = TRUE))
+print('N_used')
+with(CRISPR_cors_spread, sum(!is.na(D2_comb) & !is.na(D2_DRIVE)))
 
 ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 4, height = 3.5, dpi = 350)
 
@@ -2166,8 +2221,15 @@ bench_cors_overlap <- bench_res_overlap %>%
     dplyr::select(-p.value) %>% 
     spread(model, cor)
 
+print('Wilcox test D2 comb vs D2 Ach')
 with(bench_cors_overlap, wilcox.test(abs(D2_comb), abs(D2_Ach), paired = TRUE))
+print('N_used')
+with(bench_cors_overlap, sum(!is.na(D2_comb) & !is.na(D2_Ach)))
+
+print('Wilcox test D2 comb vs D2 DRIVE')
 with(bench_cors_overlap, wilcox.test(abs(D2_comb), abs(D2_DRIVE), paired = TRUE))
+print('N_used')
+with(bench_cors_overlap, sum(!is.na(D2_comb) & !is.na(D2_DRIVE)))
 ```
 
 ## 5e: Combined D2 improves benchmark-dependency relationships
@@ -2253,7 +2315,12 @@ ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>
 
 ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 4.5, height = 4, dpi = 350)
 
-max_comb <- max(-log10(cur_bench_p$D2_comb), na.rm=T)
+max_comb <- cur_bench_p %>% 
+  filter(D2_comb > 0) %>% 
+  mutate(x = -log10(D2_comb)) %>% 
+  .[['x']] %>% 
+  max()
+  
 cur_bench_p %<>% mutate(Dep_gene = str_match(Dep_gene, '(.+) ')[,2])
 ggplot(cur_bench_p, aes(-log10(D2_comb), -log10(D2_DRIVE))) + 
     geom_point(alpha =0.5) + 
@@ -2266,13 +2333,20 @@ ggplot(cur_bench_p, aes(-log10(D2_comb), -log10(D2_DRIVE))) +
     xlab('-log10(p-value) D2-comb') 
 ggsave(file.path(fig_dir, 'combined_scatter_p.png'), width = 4.5, height = 4, dpi = 350)
 
-with(bench_p, wilcox.test(-log10(D2_comb), -log10(D2_Ach), paired = TRUE))
-with(bench_p, wilcox.test(-log10(D2_comb), -log10(D2_DRIVE), paired = TRUE))
+print('Wilcox test log10_p D2_comb vs D2 Ach')
+with(bench_p, wilcox.test((D2_comb), (D2_Ach), paired = TRUE))
+print('N_used')
+with(bench_p, sum(!is.na(D2_comb) & !is.na(D2_Ach)))
 
-temp <- bench_p %>% 
-  mutate(D2_comb = -log10(D2_comb), D2_Ach = -log10(D2_Ach), D2_DRIVE = -log10(D2_DRIVE)) %>% 
-  mutate(D2_imp_Ach = (D2_comb - D2_Ach),
-         D2_imp_DRIVE = (D2_comb - D2_DRIVE))
+print('Wilcox test log10_p D2_comb vs D2 DRIVE')
+with(bench_p, wilcox.test((D2_comb), (D2_DRIVE), paired = TRUE))
+print('N_used')
+with(bench_p, sum(!is.na(D2_comb) & !is.na(D2_DRIVE)))
+
+# temp <- bench_p %>% 
+#   mutate(D2_comb = -log10(D2_comb), D2_Ach = -log10(D2_Ach), D2_DRIVE = -log10(D2_DRIVE)) %>% 
+#   mutate(D2_imp_Ach = (D2_comb - D2_Ach),
+#          D2_imp_DRIVE = (D2_comb - D2_DRIVE))
 
 ```
 
@@ -2460,12 +2534,18 @@ ggsave(file.path(fig_dir, 'combined_N_biomarks_found.png'), width = 4, height = 
 
 sum_stats %<>% mutate(total = related + same)
 temp <- sum_stats %>% as.data.frame() %>% column_to_rownames(var = 'dset') %>% t
-(temp['total', 'D2 comb'] - temp['total', 'D2 DRIVE']) / (temp['total', 'D2 DRIVE'])
-(temp['total', 'D2 comb'] - temp['total', 'D2 Ach']) / (temp['total', 'D2 Ach'])
-(temp['total', 'D2 comb'] / temp['total', 'D1 Ach']) 
-(temp['total', 'D2 comb']) / (temp['total', 'D1 DRIVE'])
-(temp['total', 'D2 comb'] / temp['total', 'GA Ach']) 
-(temp['total', 'D2 comb']) / (temp['total', 'GA DRIVE'])
+
+sprintf('Total improve D2 comb vs D2 DRIVE %.4f', (temp['total', 'D2 comb'] - temp['total', 'D2 DRIVE']) / (temp['total', 'D2 DRIVE']))
+
+sprintf('Total improve D2 comb vs D2 Ach: %.4f', (temp['total', 'D2 comb'] - temp['total', 'D2 Ach']) / (temp['total', 'D2 Ach']))
+
+sprintf('Fold imp D2 comb vs D1 Ach: %.4f', (temp['total', 'D2 comb'] / temp['total', 'D1 Ach']))
+
+sprintf('Fold imp D2 comb vs D1 DRIVE: %.4f', (temp['total', 'D2 comb']) / (temp['total', 'D1 DRIVE']))
+
+sprintf('Fold imp D2 comb vs GA Ach: %.4f', (temp['total', 'D2 comb'] / temp['total', 'GA Ach']))
+
+sprintf('Fold imp D2 comb vs GA DRIVE: %.4f', (temp['total', 'D2 comb']) / (temp['total', 'GA DRIVE']))
 
 
 
@@ -2513,6 +2593,10 @@ ggplot(sum_stats,
 ggsave(file.path(fig_dir, 'combined_top_class_tot.png'), width =4, height = 3.5, dpi = 350)
 
 write_rds(rel_an %>% filter(!is.na(MDP)), '~/CPDS/demeter2/results/top_MDP_stats.rds')
+```
+
+```{r}
+spread(sum_stats, dset,n) %>% DT::datatable()
 ```
 
 
@@ -2601,7 +2685,10 @@ ggplot(df, aes(ssmd)) +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication()
 
+print('GA SSMD gene slope cor, Achilles')
 with(df %>% filter(dset == 'GA_Ach'), cor.test(ssmd, Ach_gene_slope, method = 'spearman'))
+
+print('GA SSMD gene slope cor, DRIVE')
 with(df %>% filter(dset == 'GA_DRIVE'), cor.test(ssmd, DRIVE_gene_slope, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
@@ -2649,6 +2736,7 @@ ggplot(CL_data, aes(gene_slope_Ach, gene_slope_DRIVE)) +
     ylab('Screen signal (DRIVE)') +
     theme_Publication(base_font)
 
+print('gene slope cor Ach vs DRIVE')
 with(CL_data, cor.test(gene_slope_Ach, gene_slope_DRIVE, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'RNAi_eff_compare.png'), width = 4, height = 3.5, dpi = 350)
@@ -2801,9 +2889,15 @@ ggplot(bench_res_test,
     theme_Publication() 
 
 bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(-p.value, -norm_type, -dataset) %>% mutate(cor = abs(cor)), model, cor)
+
+print('Wilcox test glob norm vs CL norm Achilles')
 with(bench_res_test_spread, wilcox.test(Global_norm_Achilles, CL_norm_Achilles, paired = TRUE))
+print('N_used')
 with(bench_res_test_spread, sum(!is.na(Global_norm_Achilles) & !is.na(CL_norm_Achilles)))
+
+print('Wilcox test Glob norm vs CL norm DRIVE')
 with(bench_res_test_spread, wilcox.test(Global_norm_DRIVE, CL_norm_DRIVE, paired = TRUE))
+print('N_used')
 with(bench_res_test_spread, sum(!is.na(Global_norm_DRIVE) & !is.na(CL_norm_DRIVE)))
 
 ggsave(file.path(fig_dir, 'GAnorm_benchmark_ecdf.png'), width = 5, height = 4.5, dpi = 350)
@@ -2845,10 +2939,10 @@ test_SSMD %>% melt() %>%
 
 ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 4, height = 4, dpi = 350)
 
-
 ```
 
 ## S6 Scale param v doubling time
+
 ```{r}
 Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
     left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv')) %>% 
@@ -2892,7 +2986,10 @@ p2 <- ggplot(df, aes(gene_slope, Doubling_time)) +
     theme_Publication() +
     facet_wrap(~dset)
 
+print('Ov slope vs doubling time cor')
 with(df, cor.test(ov_slope, Doubling_time, method = 'spearman'))
+
+print('Gene slope vs doubling time cor')
 with(df, cor.test(gene_slope, Doubling_time, method = 'spearman'))
 
 cowplot::plot_grid(p1, p2, nrow=2)
@@ -3004,7 +3101,7 @@ cl_avgs_Aonly <- all_df %>%
         data.frame(SSMD = est_ssmd(df$LFC, df$b_type == 'ess'))
     })
 
-# cl_avgs_unique <- full_join(cl_avgs_Aonly, cl_avgs_Donly, by = 'CCLE_ID', suffix = c('_Aonly', '_Donly'))
+cl_avgs_unique <- full_join(cl_avgs_Aonly, cl_avgs_Donly, by = 'CCLE_ID', suffix = c('_Aonly', '_Donly'))
 # ggplot(cl_avgs_unique, aes(SSMD_Aonly, SSMD_Donly)) + 
 #     geom_point(alpha = 0.75) + 
 #     geom_abline() +
@@ -3034,15 +3131,26 @@ ggplot(hp_ssmd_t, aes(SSMD_diff, group = type, color = type)) +
 ggsave(file.path(fig_dir, 'LFC_SSMD_diff_hist.png'), width = 4.5, height = 4, dpi = 350)
 
 hp_ssmd_spread <- spread(hp_ssmd_t, type, SSMD_diff)
+
+print('Wilcoxon test common shRNAs')
 with(hp_ssmd_spread, wilcox.test(`Common shRNAs`))
+print('Median common shRNAs')
 with(hp_ssmd_spread, median(`Common shRNAs`, na.rm=T))
+print('N_used')
+with(hp_ssmd_spread, sum(!is.na(`Common shRNAs`)))
+
+print('Wilcoxon test unique shRNAs')
 with(hp_ssmd_spread, wilcox.test(`Unique shRNAs`))
+print('Median unique shRNAs')
 with(hp_ssmd_spread, median(`Unique shRNAs`, na.rm=T))
-with(hp_ssmd_spread, sum(!is.na(`Unique shRNAs`) & !is.na(`Common shRNAs`)))
+print('N_used')
+with(hp_ssmd_spread, sum(!is.na(`Unique shRNAs`)))
 
-
+print('Wilcox test Ach vs DRIVE')
 with(hp_ssmds, wilcox.test(Achilles, DRIVE, paired = TRUE))
+print('Median % imp')
 with(hp_ssmds, median((Achilles - DRIVE)/DRIVE, na.rm=T))
+print('N_used')
 with(hp_ssmds, sum(!is.na(Achilles) & !is.na(DRIVE)))
 
 only_overlapping_genes <- TRUE
@@ -3061,8 +3169,11 @@ ggplot(temp_per_CL_stats, aes(GA_Ach, GA_DRIVE)) +
     ggtitle('Gene')
 ggsave(file.path(fig_dir, 'GA_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
 
+print('Wilcox test GA Ach vs DRIVE')
 with(temp_per_CL_stats, wilcox.test(GA_Ach, GA_DRIVE, paired = TRUE))
+print('N_used')
 with(temp_per_CL_stats, sum(!is.na(GA_Ach) & !is.na(GA_DRIVE)))
+print('Median % imp')
 with(temp_per_CL_stats, median((GA_Ach - GA_DRIVE)/GA_DRIVE, na.rm=T))
 
 # binwidth <- 0.1
@@ -3093,7 +3204,9 @@ with(temp_per_CL_stats, median((GA_Ach - GA_DRIVE)/GA_DRIVE, na.rm=T))
 
 ```
 
+
 ## Ach-DRIVE dep SD compare
+
 ```{r}
 common_genes <- intersect(colnames(dep_data$D2_Ach$gene_score_SDs), colnames(dep_data$D2_DRIVE$gene_scores))
 
@@ -3164,7 +3277,9 @@ ggsave(file.path(fig_dir, 'Ach_DRIVE_geneavg_compare.png'), width = 4., height =
 
 ```
 
+
 ## Ach_DRIVE bench cor compare
+
 ```{r}
 mp <- with(bench_cors, max(max(abs(GA_Ach), na.rm=T), max(abs(GA_DRIVE), na.rm=T)))
 ggplot(bench_cors) + 
@@ -3176,10 +3291,14 @@ ggplot(bench_cors) +
     theme_Publication()
 ggsave(file.path(fig_dir, 'Ach_DRIVE_bench_compare.png'), width = 4, height = 4, dpi = 350)
 
-
+print('Wilcox test D2 Ach vs DRIVE')
 with(bench_cors, wilcox.test(abs(D2_Ach), abs(D2_DRIVE), paired=T))
+
+print('Wilcox test GA Ach vs DRIVE')
 with(bench_cors, wilcox.test(abs(GA_Ach), abs(GA_DRIVE), paired=T))
+print('Median % improvement GA')
 with(bench_cors, median((abs(GA_DRIVE) - abs(GA_Ach))/abs(GA_Ach), na.rm=T))
+print('N_used')
 with(bench_cors, sum(!is.na(GA_DRIVE) & !is.na(GA_Ach)))
 ```
 
