@@ -41,7 +41,8 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/figures_oldreg'
+fig_dir <- '~/CPDS/demeter2/results/figures'
+temp_file_suffix <- 'oldreg'
 base_font <- 12 #font size for figs
 
 ###PARAMETERS
@@ -58,10 +59,10 @@ normalization <- 'pos_neg' #type of normalization [pos_neg, global_z] (absolute 
 include_gene_families <- FALSE #whether to include gene-families in analysis
 
 recompute_biomarker <- FALSE
-biomarker_res_cache_GE <- '~/CPDS/demeter2/results/compare_biomarker_cache_GE.rds'
-biomarker_res_cache_CN <- '~/CPDS/demeter2/results/compare_biomarker_cache_CN.rds'
-biomarker_res_cache_DAM_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_DAM_MUT.rds' 
-biomarker_res_cache_HOT_MUT <- '~/CPDS/demeter2/results/compare_biomarker_cache_HOT_MUT.rds' 
+biomarker_res_cache_GE <- sprintf('~/CPDS/demeter2/results/compare_biomarker_cache_GE_%s.rds', temp_file_suffix)
+biomarker_res_cache_CN <- sprintf('~/CPDS/demeter2/results/compare_biomarker_cache_CN_%s.rds', temp_file_suffix)
+biomarker_res_cache_DAM_MUT <- sprintf('~/CPDS/demeter2/results/compare_biomarker_cache_DAM_MUT_%s.rds', temp_file_suffix)
+biomarker_res_cache_HOT_MUT <- sprintf('~/CPDS/demeter2/results/compare_biomarker_cache_HOT_MUT_%s.rds', temp_file_suffix)
 
 ###DATASETS USED
 base_data_dir <- '~/CPDS/demeter2/'
@@ -211,8 +212,18 @@ sprintf('DRIVE data, %d hps targeting %d genes, with %f hps per gene avg. %f med
         mean(DR_hp_by_gene$n), median(DR_hp_by_gene$n))
 ```
 
+```{r}
+Ach_hp_set <- read.csv(file.path(dep_data$D2_Ach$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) %>% .[['hp']]
+DRIVE_hp_set <- read.csv(file.path(dep_data$D2_DRIVE$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) %>% .[['hp']]
+Marc_hp_set <- read.csv(file.path(dep_data$D2_Marc$path, 'hp_data.csv'), stringsAsFactors = F, check.names=F) %>% .[['hp']]
+tot_hp_set <- Ach_hp_set %>% 
+  union(DRIVE_hp_set) %>% 
+  union(Marc_hp_set)
+```
 
-```{r, include = FALSE}
+
+
+```{r}
 #CALCULATE MEAN GEFF PER GENE AND FILTER OUT BAD GENES
 target_dsets <- grep('D2', names(dep_data), value = TRUE)
 
@@ -762,10 +773,10 @@ ggplot(df, aes(AGO2_GE)) +
 ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 4, height = 3.5, dpi = 350)
 
 print('AGO2-SSMD cor Achilles')
-print(with(df, cor.test(AGO2_GE, Ach_GA_ssmd)))
+print(with(df, cor.test(AGO2_GE, Ach_GA_ssmd, method = 'spearman')))
 
 print('AGO2-SSMD cor DRIVE')
-print(with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd)))
+print(with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd, method = 'spearman')))
 
 ggplot(df, aes(AGO2_GE)) + 
     ylab('Common-essential\nmedian dependency') +
@@ -948,7 +959,7 @@ df <- data.frame(Gene = colnames(c_D1),
     left_join(gene_avgs %>% filter(dset == 'D2_DRIVE'), by = 'Gene')
 
 make_net_plot <- function(cur_df, C_mat) {
-    max_nodes <- 20
+    max_nodes <- 25
     min_size <- 10
     max_size <- 30
     cor_z_thresh <- 4
@@ -1009,17 +1020,20 @@ make_net_plot <- function(cur_df, C_mat) {
                           vertex.label.dist = 0,
                           vertex.label = node_df$label,
                           vertex.label.color = 'black',
+                          vertex.frame.color = 'black',
                           vertex.color = node_df$color,
-                          vertex.size = vertex_size*1,
+                          vertex.size = vertex_size*0.75,
                           vertex.alpha = 0.75,
                           vertex.shape = 'circle',
-                          edge.arrow.size = 0.1,
+                          edge.arrow.size = 0,
                           edge.curved = 0.1,
                           layout = layout_nicely,
-                          vertex.label.cex = 0.85,
-                          edge.width=edge_df$cor*0.5)
+                          vertex.label.dist=1,
+                          vertex.label.font=2,
+                          vertex.label.cex = 0.7,
+                          edge.width=edge_df$cor*0.2)
 }
-set.seed(1)
+set.seed(5)
 pdf(file.path(fig_dir, 'GA_cornet_examp.pdf'), width = 5, height = 6)
 make_net_plot(df %>% mutate(cor = GA_c, cor_z = GA_c_z), c_GA_z)
 dev.off()
@@ -2541,6 +2555,10 @@ sprintf('Total improve D2 comb vs D2 Ach: %.4f', (temp['total', 'D2 comb'] - tem
 
 sprintf('Fold imp D2 comb vs D1 Ach: %.4f', (temp['total', 'D2 comb'] / temp['total', 'D1 Ach']))
 
+sprintf('Fold imp D2 comb vs D2 DRIVE: %.4f', (temp['total', 'D2 comb']) / (temp['total', 'D2 DRIVE']))
+
+sprintf('Fold imp D2 comb vs D2 Achilles: %.4f', (temp['total', 'D2 comb']) / (temp['total', 'D2 Ach']))
+
 sprintf('Fold imp D2 comb vs D1 DRIVE: %.4f', (temp['total', 'D2 comb']) / (temp['total', 'D1 DRIVE']))
 
 sprintf('Fold imp D2 comb vs GA Ach: %.4f', (temp['total', 'D2 comb'] / temp['total', 'GA Ach']))
@@ -2554,7 +2572,7 @@ rel_an %<>% mutate(MDP = NA,
   MDP = ifelse(cor < 0 & feat_type %in% c('MUT_HOT') & source == 'same', "Onc mut", MDP),
   MDP = ifelse(cor < 0 & feat_type %in% c('GE', 'CN') & source == 'same', 'Onc exp', MDP),
   MDP = ifelse(cor > 0 & feat_type %in% c('GE', 'CN', 'MUT_DAM') & source == 'paralog', 'paralog loss', MDP),
-  MDP = ifelse(source %in% c('CORUM', 'ppi'), "physical interaction", MDP)
+  MDP = ifelse(source %in% c('CORUM', 'ppi'), "interacting protein", MDP)
 )
 
 sum_stats <- rel_an %>%
@@ -2570,10 +2588,12 @@ mod_order <- sum_stats %>%
     arrange(desc(tot)) %>% 
     .[['dset']]
 sum_stats %<>% mutate(dset = factor(dset, levels = mod_order))
+MDP_order <- c('Cyclops', 'interacting protein', 'paralog loss', 'Onc exp', 'Onc mut')
+sum_stats %<>% mutate(MDP = factor(MDP, levels = MDP_order))
 
 ggplot(sum_stats, 
        aes(dset, n, fill = MDP)) +
-    geom_bar(stat = 'identity', position = 'dodge') +
+    geom_bar(stat = 'identity', position = 'dodge', width = 0.7) +
     ylab('Num. dep.-feature pairs') +
     theme_Publication(base_font) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
