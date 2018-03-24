@@ -90,7 +90,8 @@ process_LFC <- function(LFC, datatype, batch_name, distinct_hp) {
   }
   
   long <- new_LFC %>% 
-    reshape2::melt(varnames = c('Gene', 'CL'), value.name = 'LFC')
+    as.matrix() %>% 
+    melt(varnames = c('Gene', 'CL'), value.name = 'LFC')
   return(long)
 }
 
@@ -249,7 +250,6 @@ preprocess_for_ATARiS <- function(LFC_mats, datatype, batch_names) {
 }
 
 # Save output in corresponding ATARiS directory
-
 helper_filter <- function(fname) {
   df <- read.gct(fname)
   genes <- str_match(rownames(df), '.+\\)') %>% as.vector()
@@ -259,7 +259,8 @@ helper_filter <- function(fname) {
   # Keep first ATARiS solution for each gene
   filtered_df <- df[match(unique(genes), genes),]
   long <- filtered_df %>% 
-    reshape2::melt(varnames = c('Gene', 'CL'), value.name = 'Score')
+    as.matrix() %>% 
+    melt(varnames = c('Gene', 'CL'), value.name = 'Score')
   return(long)
 }
 
@@ -282,8 +283,15 @@ preprocess_for_ATARiS(DRIVE_LFC_mats, 'DRIVE', DRIVE_batch_names)
 
 #### INTERMEDIATE STEP: Run ATARiS on Gene Pattern ####
 
-postprocess_ATARiS_output(paste0(paths$Achilles_ATARiS_directory, c('Achilles_55k.Gs.gct', 'Achilles_98k.Gs.gct')), paths$Achilles_ATARiS_scores_fname, TRUE)
-postprocess_ATARiS_output(paste0(paths$DRIVE_ATARiS_directory, 'DRIVE.Gs.gct'), paths$DRIVE_ATARiS_scores_fname, FALSE)
+# Save ATARiS output in corresponding ATARiS "output" directory
+# Use identifiers Achilles_55k, Achilles_98k, and DRIVE
+postprocess_ATARiS_output(
+  paste0(paths$Achilles_ATARiS_output_directory, c('Achilles_55k.Gs.gct', 'Achilles_98k.Gs.gct')), 
+  paths$Achilles_ATARiS_scores_fname, TRUE)
+
+postprocess_ATARiS_output(
+  paste0(paths$DRIVE_ATARiS_output_directory, 'DRIVE.Gs.gct'), 
+  paths$DRIVE_ATARiS_scores_fname, FALSE)
 
 ############
 # DEMETER 1 
@@ -363,9 +371,9 @@ preprocess_for_DEMETER1(DRIVE_LFC_mats, 'DRIVE', DRIVE_batch_names, paths$DRIVE_
 
 #### INTERMEDIATE STEP: Run DEMETER on the cloud with output of preprocessing step (see run_DEMETER1 for more details) ####
 
-# Create "output" directory in corresponding DEMETER1 directory and save DEMETER1 output
-Achilles_DEMETER1_output_fname <- paste0(paths$Achilles_DEMETER1_directory, 'output/GeneSols.csv')
-DRIVE_DEMETER1_output_fname <- paste0(paths$DRIVE_DEMETER1_directory, 'output/GeneSols.csv')
+# Save DEMETER1 output in corresponding DEMETER1 "output" directory
+Achilles_DEMETER1_output_fname <- paste0(paths$Achilles_DEMETER1_output_directory, 'GeneSols.csv')
+DRIVE_DEMETER1_output_fname <- paste0(paths$DRIVE_DEMETER1_output_directory, 'GeneSols.csv')
 
 postprocess_DEMETER1_output(Achilles_DEMETER1_output_fname, paths$Achilles_DEMETER1_scores_fname)
 postprocess_DEMETER1_output(DRIVE_DEMETER1_output_fname, paths$DRIVE_DEMETER1_scores_fname)

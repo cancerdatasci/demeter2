@@ -38,10 +38,12 @@ for (datatype in c('Achilles', 'DRIVE')) {
   # Set up basic ATARiS directories
   paths <- c(paths, paste0(root, datatype, '/ATARiS/') %>% as.list() %>% setNames(paste0(datatype, '_ATARiS_directory')))
   paths <- c(paths, paste0(root, datatype, '/ATARiS/', datatype, '_ATARiS_scores.csv') %>% as.list() %>% setNames(paste0(datatype, '_ATARiS_scores_fname')))
+  paths <- c(paths, paste0(root, datatype, '/ATARiS/output/') %>% as.list() %>% setNames(paste0(datatype, '_ATARiS_output_directory')))
   # Set up basic DEMETER1 directories
   paths <- c(paths, paste0(root, datatype, '/DEMETER1/') %>% as.list() %>% setNames(paste0(datatype, '_DEMETER1_directory')))
   paths <- c(paths, paste0(root, datatype, '/DEMETER1/', datatype, '_DEMETER1_scores.csv') %>% as.list() %>% setNames(paste0(datatype, '_DEMETER1_scores_fname')))
   paths <- c(paths, paste0(root, datatype, '/DEMETER1/', datatype, '_DEMETER1_batches.csv') %>% as.list() %>% setNames(paste0(datatype, '_DEMETER1_batches_fname')))
+  paths <- c(paths, paste0(root, datatype, '/DEMETER1/output/') %>% as.list() %>% setNames(paste0(datatype, '_DEMETER1_output_directory')))
 }
 
 # Miscellaneous
