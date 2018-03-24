@@ -645,6 +645,11 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
         if (cur_dep_info$mod_type == 'D2' & use_bayes) {
             cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,!grepl('XLOC', colnames(cur_dep_info$gene_score_SDs))]
         }
+        #ignore non Entrez genes
+        cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,grepl('[0-9]', colnames(cur_dep_info$gene_scores))]
+        if (cur_dep_info$mod_type == 'D2' & use_bayes) {
+          cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,grepl('[0-9]', colnames(cur_dep_info$gene_score_SDs))]
+        }
         
         if (!is.null(name_map)) {
           rownames(cur_dep_info$gene_scores) %<>% plyr::revalue(name_map)
@@ -825,7 +830,7 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
 
         #isolate this part in separate script to avoid memory issues with foreach parallelization
         write_rds(inputs, input_cache_file)
-        source('~/CPDS/demeter2/scripts/get_cors_internal.R')
+        source('~/CPDS/packages/demeter2_pub/scripts/get_cors_internal.R')
         cur_res <- read_rds(output_res_file)
 
         full_res %<>% rbind(cur_res)
@@ -837,11 +842,9 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
 
     full_res %<>% filter(!is.na(feat_gene)) %>%
         mutate(feat_gene = as.character(feat_gene),
-               targ_gene = as.character(targ_gene)) %>%
-        mutate(feat_sym = as.vector(IDs_to_symbols[feat_gene]),
-               targ_sym = as.vector(IDs_to_symbols[targ_gene]))
+               targ_gene = as.character(targ_gene))
 
-    full_res %<>% left_join(related_genes, by = c('feat_sym' = 'partner', 'targ_sym' = 'target'))
+    full_res %<>% left_join(related_genes, by = c('feat_gene' = 'partner_ID', 'targ_gene' = 'target_ID'))
 
     full_res %<>% mutate(source = ifelse(feat_gene == targ_gene, 'same', source))
     return(full_res)
@@ -858,18 +861,6 @@ get_top_biomarker_cors <- function(targ_dsets, dep_data, feature_mat, IDs_to_sym
     # return(rel_an)
 }
 
-
-
-LRT_test <- function(vec) {
-    library(MASS); library(sn)
-    vec <- vec[!is.na(vec)]
-    st_LL <- data.frame(data = vec) %>%
-        selm(data ~ 1, family = "ST", data = .) %>%
-        logLik %>%
-        as.numeric()
-    n_LL <- fitdistr(vec, 'normal')$loglik
-    return(2*(st_LL - n_LL))
-}
 
 get_gene_avgs <- function(dep_data, target_dsets, pos_cons, neg_cons, use_bayes = TRUE) {
     ## Calcultate per-gene averages for set of models
@@ -942,7 +933,7 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
             return(data.frame())
         }
         all_cors <- ldply(target_dsets %>% set_names(target_dsets), function(dname) {
-            if (!(bench$Dep_Gene_ID %in% colnames(dep_data[[dname]]$gene_scores))) {
+           if (!(bench$Dep_Gene_ID %in% colnames(dep_data[[dname]]$gene_scores))) {
                 return(data.frame(cor = NA))
             }
             dep <- dep_data[[dname]]$gene_scores[, bench$Dep_Gene_ID]
@@ -963,9 +954,13 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
                   if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
                     inG <- cur_CLs[feature[cur_CLs] == 1]
                     outG <- cur_CLs[feature[cur_CLs] == 0]
-                    tres <- wtd.t.test(dep[inG], dep[outG], 
+                    if (length(inG) >= 2 & length(outG) >= 2) {
+                      tres <- wtd.t.test(dep[inG], dep[outG], 
                                     weight = 1/dep_SD[inG]^2, weighty = 1/dep_SD[outG]^2)
                     pvalue <- tres$coefficients[['p.value']]
+                    } else {
+                      pvalue <- NA
+                    }
                     ptype <- 'ttest'
                   }
                   res <- data.frame(cor = c[1, 'correlation'], p.value = pvalue, ptype = ptype)
@@ -975,8 +970,14 @@ get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_d
                 pvalue <- c$p.value
                 ptype <- 'cor'
                 if (bench$feat_type %in% c('MUT_HOT', 'MUT_MIS', 'MUT_DAM')) {
-                  tres <- t.test(dep[inG], dep[outG])
-                  pvalue <- tres$p.value
+                  inG <- cur_CLs[feature[cur_CLs] == 1]
+                  outG <- cur_CLs[feature[cur_CLs] == 0] 
+                  if (length(inG) >= 2 & length(outG) >= 2) {
+                    tres <- t.test(dep[inG], dep[outG])
+                    pvalue <- tres$p.value
+                  } else {
+                    pvalue <- NA
+                  }
                   ptype <- 'ttest'
                 }
                 res <- data.frame(cor = c$estimate, p.value = pvalue, ptype = ptype)
