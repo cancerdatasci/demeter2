@@ -645,6 +645,11 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
         if (cur_dep_info$mod_type == 'D2' & use_bayes) {
             cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,!grepl('XLOC', colnames(cur_dep_info$gene_score_SDs))]
         }
+        #ignore non Entrez genes
+        cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,grepl('[0-9]', colnames(cur_dep_info$gene_scores))]
+        if (cur_dep_info$mod_type == 'D2' & use_bayes) {
+          cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,grepl('[0-9]', colnames(cur_dep_info$gene_score_SDs))]
+        }
         
         if (!is.null(name_map)) {
           rownames(cur_dep_info$gene_scores) %<>% plyr::revalue(name_map)

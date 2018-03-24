@@ -126,7 +126,7 @@ hart_non_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data
 
 load('~/CPDS/data/CCLE/Annotations.RData')
 
-sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=2)
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=2, data.file = 'shmap_19mer_noXLOC')
 Gene_ID_to_symb <- sh_targets %>% 
     filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
     filter(grepl('[0-9]', `Gene ID`)) %>% 
@@ -194,7 +194,8 @@ Ach_hp_data <- read.csv(file.path(dep_data$D2_Ach$path, 'hp_data.csv'), stringsA
 Ach_hp_by_gene <- Ach_hp_data %>% 
     dplyr::select(hp, Geff) %>% 
     left_join(sh_targets, by = c('hp' = 'Barcode Sequence')) %>% 
-    filter(!grepl('NO_CURRENT', 'Gene ID')) %>% 
+    filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
+    filter(grepl('[0-9]', `Gene ID`)) %>% 
     group_by(`Gene ID`) %>% 
     summarise(n = n(), max_Geff = max(Geff, na.rm=T)) %>% 
     filter(n >= min_hps_per_gene)
@@ -205,7 +206,8 @@ DR_hp_data <- read.csv(file.path(dep_data$D2_DRIVE$path, 'hp_data.csv'), strings
 DR_hp_by_gene <- DR_hp_data %>% 
     dplyr::select(hp, Geff) %>% 
     left_join(sh_targets, by = c('hp' = 'Barcode Sequence')) %>% 
-    filter(!grepl('NO_CURRENT', 'Gene ID')) %>% 
+    filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
+    filter(grepl('[0-9]', `Gene ID`)) %>% 
     group_by(`Gene ID`) %>% 
     summarise(n = n(), max_Geff = max(Geff, na.rm=T)) %>% 
     filter(n >= min_hps_per_gene)
@@ -220,6 +222,7 @@ Marc_hp_set <- read.csv(file.path(dep_data$D2_Marc$path, 'hp_data.csv'), strings
 tot_hp_set <- Ach_hp_set %>% 
   union(DRIVE_hp_set) %>% 
   union(Marc_hp_set)
+sprintf('%d total hairpins', length(tot_hp_set))
 ```
 
 
