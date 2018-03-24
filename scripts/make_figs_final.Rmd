@@ -126,7 +126,7 @@ hart_non_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data
 
 load('~/CPDS/data/CCLE/Annotations.RData')
 
-sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=1, data.file='CP1175_20171102_19mer')
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=6)
 Gene_ID_to_symb <- sh_targets %>% 
     filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
     dplyr::select(`Gene Symbol`, `Gene ID`) %>% 
@@ -1691,8 +1691,8 @@ ggplot(unc_df, aes(ssmd, avg_sd)) +
     xlab('Cell line screen quality\n(GA model SSMD)') +
     theme_Publication(base_font)
 
-print('Avg_SD vs gene_slope cor')
-with(avg_unc, cor.test(avg_sd, gene_slope, method = 'spearman'))
+print('Avg_SD vs SSMD cor')
+with(unc_df, cor.test(avg_sd, ssmd, method = 'spearman'))
 
 ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
 ```
