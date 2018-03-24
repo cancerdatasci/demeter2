@@ -29,3 +29,5 @@ sparkles sub --clean --loglive -n comb_final -u /Users/jmmcfarl/CPDS/demeter2/da
 
 #Gene set xval
 sparkles sub -n Ach_gene_xval --params ./seed_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --gene_xv_frac 0.5 --max_alt_iters 4 --no_edward --save_perf_only --random_seed '{random_seed}'
+
+

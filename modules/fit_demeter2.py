@@ -123,7 +123,7 @@ print('Read {} data files'.format(len(dsets)))
 if (args.sh_targets is not None) and os.path.exists(args.sh_targets):
     sh_targets = pd.read_csv(args.sh_targets)
 else:
-    sh_targets = tc.get(name='gpp-shrna-mapping-8759', version=6, file='shmap_19mer_noXLOC_Entrezonly')
+    sh_targets = tc.get(name='gpp-shrna-mapping-8759', version=2, file='shmap_19mer_noXLOC')
 sh_targets.rename(columns = {'Barcode Sequence': 'SEQ', 'Gene ID': 'Gene_ID'}, inplace=True)
 
 sh_targets.dropna(subset = ['Gene_ID'], inplace=True)

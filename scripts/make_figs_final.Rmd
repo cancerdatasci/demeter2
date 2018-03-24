@@ -126,9 +126,10 @@ hart_non_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data
 
 load('~/CPDS/data/CCLE/Annotations.RData')
 
-sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=6)
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=2)
 Gene_ID_to_symb <- sh_targets %>% 
     filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
+    filter(grepl('[0-9]', `Gene ID`)) %>% 
     dplyr::select(`Gene Symbol`, `Gene ID`) %>% 
     distinct(`Gene ID`, .keep_all=T)
 Gene_ID_to_symb <- Gene_ID_to_symb$`Gene Symbol` %>% set_names(Gene_ID_to_symb$`Gene ID`)
