@@ -86,7 +86,7 @@ dep_datasets <- list(
                       taiga_version = 5),
     ATARiS_DRIVE = list(mod_type = 'ATARiS', dataset = 'DRIVE', type = 'rel',
                       taiga_name = 'drive-ataris-scores-1988', 
-                      taiga_version = 5),
+                      taiga_version = 6),
     GA_Ach = list(mod_type = 'GA', dataset = 'Ach', type = 'abs',
                    taiga_name = 'achilles-gene-averaging-matrices-608b',
                    taiga_version = 10),
@@ -250,7 +250,7 @@ for (cur_dset in target_dsets) {
     
     avg_Geffs %<>% rbind(cur_avg_Geff %>% mutate(dset = cur_dset))
 }
-
+avg_Geffs %<>% filter(!is.na(Gene_ID))
 ```
 
 ```{r, include = FALSE}
@@ -1310,7 +1310,7 @@ p1 <- ggplot(GE_cors %>% filter(grepl('Ach', dset)) %>%
     ylab('Avg. dep-GE\ncorrelation magnitude') +
     xlab('Cell line avg. dependency score') +
     # ggtitle("Achilles") +
-    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.325)) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.35)) +
     guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
     # scale_colour_Publication() +
     scale_color_manual(values = mod_type_pal) +
@@ -1324,7 +1324,7 @@ p2 <- ggplot(GE_cors %>% filter(grepl('DRIVE', dset)) %>%
     ylab('Avg. dep-GE\ncorrelation magnitude') +
     xlab('Cell line avg. dependency score') +
     # ggtitle('DRIVE') +
-    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.325)) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.375)) +
     guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
     # scale_colour_Publication() +
     scale_color_manual(values = mod_type_pal) +

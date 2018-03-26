@@ -65,25 +65,15 @@ RUN cd /tmp/taigapy && \
 
 
 # install kubeque
-RUN echo v3 && mkdir /tmp/kubeque && \
-    cd /tmp/kubeque && \
-    wget 'https://github.com/broadinstitute/kubeque/archive/master.zip' -O master.zip && \
+RUN echo v3 && mkdir /tmp/sparkles && \
+    cd /tmp/sparkles && \
+    wget 'https://github.com/broadinstitute/sparklespray/archive/master.zip' -O master.zip && \
     unzip master.zip && \
-    cd kubeque-master && \
+    cd sparkles-master && \
     python setup.py install 
 
-#RUN pip install simplejson
 RUN pip install json-tricks
 
-# install dev version of kubeque
-#USER root
-#COPY kubeque-0.2.tar.gz /tmp
-#USER edward
-#RUN mkdir /tmp/kubeque && \
-#    cd /tmp/kubeque && \
-#    tar xzf /tmp/kubeque-0.2.tar.gz && \
-#    cd kubeque-0.2 && \
-#    python setup.py install
     
 #################################################################################################################
 #           WORK Jupyter
