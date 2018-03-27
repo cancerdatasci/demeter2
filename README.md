@@ -4,10 +4,10 @@ DEMETER2 version 1.0
 
 ## Installation
 
-From inside the demeter2 directory, build the docker image:
+Pull the docker image:
 
 ```bash
-docker build Docker
+docker pull jmmcfarl/demeter2_pub
 ```
 
 ## Setting up input files
@@ -29,9 +29,9 @@ Each of the data files must be csv file containing a matrix of log-fold-change v
 Create a text file which has the path to each data file you want to include on a separate line, with a single header line "data_file_paths". It should look like this (providing two matrices of LFC values as inputs):
 
 data_file_paths
-/data/achilles-55k-batch2-repcollapsed-lfc_v1-shrna-55k-2-lfc.csv
-/data/achilles-98k-repcollapsed-lfc_v1-shrna-98k-lfc.csv
-
+/data/achilles-55k-batch1-repcollapsed-lfc.csv
+/data/achilles-55k-batch2-repcollapsed-lfc.csv
+/data/achilles-98k-repcollapsed-lfc.csv
 
 Note: these paths will all be relative paths inside of the docker container, so it's easiest to just put the data files in a folder, and then map that directory to `/data/` inside the container.
 
@@ -57,7 +57,7 @@ Same as above for negative control genes.
 From inside the demeter2 directory run:
 
 ```bash
-docker run -it -v ./:/demeter2 -v /path/to/data/:/data <demeter2_docker_image> /bin/bash
+docker run -it -v ./:/demeter2 -v /path/to/data/:/data jmmcfarl/demeter2_pub /bin/bash
 ```
 
 This will launch the docker container, map the current directory to `/demeter2` inside the container, and your data directory to `/data`, then launch a bash prompt inside the container.
@@ -68,9 +68,9 @@ Then, from within the container, you can run the model by e.g.:
 python3 /demeter2/modules/fit_demeter2.py \
 	--model_dir output_path \ 
 	--data_file /data/data_files_Achilles_paths \
-	--sh_targets /data/gpp-shrna-mapping_v1-cp1175-20171102-19mer.csv \
-	--pos_cons /data/demeter2-pos-neg-controls_v1-hart-pos-controls.csv \
-	--neg_cons /data/demeter2-pos-neg-controls_v1-hart-neg-controls.csv 
+	--sh_targets /data/shRNA-mapping.csv \
+	--pos_cons /data/Hart-pos-controls.csv \
+	--neg_cons /data/Hart-neg-controls.csv 
 ```
 
 ## Model outputs
