@@ -14,6 +14,7 @@ if "../modules" not in sys.path:
     sys.path.append("../modules")
 import preprocess
 from taigapy import TaigaClient
+
 import demeter2
 
 import warnings
@@ -101,7 +102,7 @@ elif os.path.exists('taiga/token'):
 input_data = pd.read_csv(args.data_files, sep = '\t').dropna(axis = 0, how = 'all')
 def get_dset(input_info):
     if len(input_info) == 1:
-        print('Loading dataset from: {}'.format(input_data['data_file_paths'].values))
+        print('Loading dataset from: {}'.format(input_info['data_file_paths']))
         cur_data = pd.read_csv(input_info['data_file_paths'], index_col = 0)
     else:
         print('Fetching taiga dataset: {} file: {}, version: {}'.format(input_info['data_set'], 
