@@ -408,14 +408,15 @@ make_CL_vs_avg_plot <- function(dep_name, test_CLs, gene_avgs) {
                       filter(dset == dep_name) %>%
                       .[, c('Gene', 'avg_score', 'gene_type')], by = 'Gene') %>%
         # mutate(CCLE_ID = factor(CCLE_ID, levels = test_CLs))
-        mutate(CL_name = str_match(CCLE_ID, '([:alnum:]+)_')[,2])
+        mutate(CL_name = str_match(CCLE_ID, '([:alnum:]+)_')[,2]) %>% 
+        mutate(plyr::revalue(gene_type, c(non_essential = 'non-essential')))
     ggplot(df, aes(avg_score, score)) +
         geom_point(alpha = 0.75, size = 0.75, color = 'grey') +
-        geom_density_2d(data = filter(df, gene_type %in% c('essential', 'non_essential')),
+        geom_density_2d(data = filter(df, gene_type %in% c('essential', 'non-essential')),
                         aes(color = gene_type)) +
         geom_abline() +
         # geom_smooth(color = 'orange') +
-        xlab('Cell line avg. dependency score') + ylab('CL dependency score') +
+        xlab('Cell line avg. dependency score') + ylab('Cell line dependency score') +
         guides(color = guide_legend(title = 'Gene type', override.aes = list(lwd = 3))) +
         ggtitle(dep_name) +
         facet_wrap(~CL_name)

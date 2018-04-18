@@ -114,19 +114,19 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_SDs_proc.csv')
 #D2 Combined model fit
 #---------------------------------------------------------------------------------------------------------
 #CL data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=7, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='CL_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_CL_data.csv')
 
 #hp data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=7, data.file='hp_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='hp_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_hp_data.csv')
 
 #gene means
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=7, data.file='gene_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_means_proc.csv')
 
 #gene SDs
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=7, data.file='gene_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_SDs_proc.csv')
 
 

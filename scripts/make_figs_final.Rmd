@@ -439,7 +439,7 @@ ggplot(ov_gene_sep_stats %>%
     ylab('Cell line avg. dependency\npos/neg separation (SSMD)') +
     scale_fill_manual(values = mod_type_pal) +
     theme_Publication(base_font) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), axis.title.x = element_blank()) +
     guides(fill = guide_legend(title = element_blank()))
 
 export_fig('GSavg_SSMD_compare', width = 3.5, height = 3.5)
@@ -750,7 +750,7 @@ df <- data.frame(AGO2_GE = feature_data$GE[, '27161'], CCLE_ID = rownames(featur
 
 ggplot(df, aes(AGO2_GE)) + 
     ylab('Screen signal') +
-    xlab('AGO2 Gene expression (logTPM)') +
+    xlab('AGO2 Gene expression (log RPKM)') +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles')) +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_gene_slope, fill = 'DRIVE')) +
     geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_gene_slope, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
@@ -763,8 +763,8 @@ ggplot(df, aes(AGO2_GE)) +
 ggsave(file.path(fig_dir, 'AGO2_vs_RNAi_eff.png'), width = 4, height = 3.5, dpi = 350)
 
 ggplot(df, aes(AGO2_GE)) + 
-    ylab('Screen quality (SSMD)') +
-    xlab('AGO2 Gene expression (logTPM)') +
+    ylab('Screen quality\n(pos/neg control SSMD)') +
+    xlab('AGO2 Gene expression (log RPKM)') +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_GA_ssmd, fill = 'Achilles')) +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_GA_ssmd, fill = 'DRIVE')) +
     geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_GA_ssmd, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
@@ -774,7 +774,7 @@ ggplot(df, aes(AGO2_GE)) +
     # scale_fill_Publication() +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication(base_font)
-ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 3.6, height = 3.25, dpi = 350)
 
 print('AGO2-SSMD cor Achilles')
 print(with(df, cor.test(AGO2_GE, Ach_GA_ssmd, method = 'spearman')))
@@ -784,7 +784,7 @@ print(with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd, method = 'spearman')))
 
 ggplot(df, aes(AGO2_GE)) + 
     ylab('Common-essential\nmedian dependency') +
-    xlab('AGO2 Gene expression (logTPM)') +
+    xlab('AGO2 Gene expression (log RPKM)') +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = Ach_GA_pcm, fill = 'Achilles')) +
     geom_point(alpha = 0.75, shape = 21, size = 1.5, color = 'white', aes(y = DRIVE_GA_pcm, fill = 'DRIVE')) +
     geom_smooth(alpha = 0.25, color = 'white', aes(y = Ach_GA_pcm, fill = 'Achilles'), method = 'lm', lwd = 0.75) +
@@ -1228,7 +1228,7 @@ ggplot(df, aes(D1_Ach, D2_Ach)) +
     scale_fill_manual(values = gene_type_pal) +
     theme_Publication(base_font)
 
-ggsave(file.path(fig_dir, 'CRISPR_cor_scatter.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cor_scatter.png'), width = 3.5, height = 3, dpi = 350)
 ```
 
 ## 3b: Improved agreement with CRISPR across datasets
@@ -1274,8 +1274,8 @@ p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="
              mylegend, nrow=2,heights=c(10, 1))
 
 ggsave(file.path(fig_dir, 'CRISPR_cor_smooth.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_Ach.png'), plot = p1, width = 3.5, height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cor_smooth_DRIVE.png'), plot = p2, width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -1338,8 +1338,8 @@ p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="
              mylegend, nrow=2,heights=c(10, 1))
 
 ggsave(file.path(fig_dir, 'GE_cor_smooth.png'), plot = p, width = 6, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'GE_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'GE_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'GE_cor_smooth_Ach.png'), plot = p1, width = 3.5, height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'GE_cor_smooth_DRIVE.png'), plot = p2, width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -1407,8 +1407,8 @@ p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="
              mylegend, nrow=2,heights=c(10, 1))
 
 ggsave(file.path(fig_dir, 'CN_cor_smooth.png'), plot = p, width = 6, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'CN_cor_smooth_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'CN_cor_smooth_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CN_cor_smooth_Ach.png'), plot = p1, width = 3.5, height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'CN_cor_smooth_DRIVE.png'), plot = p2, width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -1472,7 +1472,7 @@ p <- grid.arrange(arrangeGrob(g1 + theme(legend.position="none"),
                          g2 + theme(legend.position="none"),
                          nrow=1),
              mylegend, nrow=2,heights=c(10, 2))
-ggsave(file.path(fig_dir, 'cyclops_example.png'), plot = p, width = 7, height = 4., dpi = 350)
+ggsave(file.path(fig_dir, 'cyclops_example.png'), plot = p, width = 6., height = 3.5, dpi = 350)
 
 ```
 
@@ -1620,8 +1620,8 @@ p <- grid.arrange(arrangeGrob(p1 + ggtitle('Achilles') + theme(legend.position="
              mylegend, nrow=2,heights=c(10, 1))
 
 ggsave(file.path(fig_dir, 'bench_ecdf.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'bench_ecdf_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'bench_ecdf_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_ecdf_Ach.png'), plot = p1, width = 3.5, height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_ecdf_DRIVE.png'), plot = p2, width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -1645,7 +1645,7 @@ p1 <- ggplot(df %>% filter(dset == 'Ach'),
     ylab('Percent strong\nfeature-dep correlation') +
     theme_Publication() +
     # ylim(0,ymax) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12),
           axis.title.x = element_blank()) +
     guides(fill = guide_legend(title = element_blank()))
 
@@ -1656,7 +1656,7 @@ p2 <- ggplot(df %>% filter(dset == 'DRIVE'),
     ylab('Percent strong\nfeature-dep correlation') +
     theme_Publication() +    
         # ylim(0,ymax) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12),
           axis.title.x = element_blank()) +
     guides(fill = guide_legend(title = element_blank()))
 
@@ -1664,8 +1664,8 @@ p <- arrangeGrob(p1 + theme(legend.position="none"),
                          p2 + theme(legend.position="none"),
                          nrow=1)
 ggsave(file.path(fig_dir, 'bench_strong_cors_bar.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'bench_strong_cors_bar_Ach.png'), plot = p1, width = 4, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'bench_strong_cors_bar_DRIVE.png'), plot = p2, width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_strong_cors_bar_Ach.png'), plot = p1, width = 3.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'bench_strong_cors_bar_DRIVE.png'), plot = p2, width = 3.5, height = 3.5, dpi = 350)
 
 ```
 
@@ -1698,7 +1698,7 @@ ggplot(unc_df, aes(ssmd, avg_sd)) +
 print('Avg_SD vs SSMD cor')
 with(unc_df, cor.test(avg_sd, ssmd, method = 'spearman'))
 
-ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'SSMD_vs_avg_unc.png'), width = 3.5, height = 3, dpi = 350)
 ```
 
 ```{r}
@@ -1711,7 +1711,7 @@ ggplot(unc_df, aes(rep_cor, avg_sd)) +
 print('Avg_SD vs rep_cor cor')
 with(unc_df, cor.test(avg_sd, rep_cor, method = 'spearman'))
 
-ggsave(file.path(fig_dir, 'repcor_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'repcor_vs_avg_unc.png'), width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -1732,7 +1732,7 @@ plot_colorByDensity(sum_Geff, 'sum_Geff', 'gene_avg_SD') +
     ylab('Average dependency score\nuncertainty (SD)') +
     theme_Publication(base_font)
 
-ggsave(file.path(fig_dir, 'hpEff_vs_avg_unc.png'), width = 4, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'hpEff_vs_avg_unc.png'), width = 3.5, height = 3, dpi = 350)
 ```
 
 
@@ -1814,7 +1814,7 @@ p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
                          nrow=1),
              mylegend, nrow=2,heights=c(10, 1))
 
-ggsave(file.path(fig_dir, 'CRISPR_cors_unc_smooth.png'), plot = p, width = 6.5, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'CRISPR_cors_unc_smooth.png'), plot = p, width = 6.5, height = 3, dpi = 350)
 
 ```
 
@@ -2045,8 +2045,8 @@ p <- arrangeGrob(p2 + theme(legend.position="none"),
 #                          nrow=1),
 #              mylegend, nrow=2,heights=c(10, 1))
 
-ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 9.5, height = 3.5, dpi = 350)
-ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 9.5, height = 3.5, device = cairo_pdf())
+ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 8.5, height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 8.5, height = 3, device = cairo_pdf())
 
 # #QUANTIFY structure in PCs related to batch
 # a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
@@ -2157,7 +2157,7 @@ p2 <- ggplot(df %>% mutate(dset = factor(dset, levels = df %>%
        aes(dset, cor, fill = model)) + 
     geom_bar(stat = 'identity') +
     guides(fill = FALSE) +
-    ylab('Correlation of cell line avg. with CRISPR') +
+    ylab('Correlation of cell line\navg. with CRISPR') +
     # xlab('Dataset') +
     scale_fill_manual(values = mod_type_pal) +
     theme_Publication(base_font) +
@@ -2222,7 +2222,7 @@ with(CRISPR_cors_spread, wilcox.test(D2_comb, D2_DRIVE, paired = TRUE))
 print('N_used')
 with(CRISPR_cors_spread, sum(!is.na(D2_comb) & !is.na(D2_DRIVE)))
 
-ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -2274,7 +2274,7 @@ ggplot(df %>% filter(variable %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')
     # theme(legend.text = element_text(size = 7))
 
 
-ggsave(file.path(fig_dir, 'combined_bench_ecdf.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_bench_ecdf.png'), width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -2331,7 +2331,7 @@ ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>
     theme_Publication(base_font) 
     # theme(legend.text = element_text(size = rel(0.95)))
 
-ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 3.5, height = 3.25, dpi = 350)
 
 max_comb <- cur_bench_p %>% 
   filter(D2_comb > 0) %>% 
@@ -2349,7 +2349,7 @@ ggplot(cur_bench_p, aes(-log10(D2_comb), -log10(D2_DRIVE))) +
     # geom_smooth(method = 'lm', color = 'red', se = FALSE) + 
     ylab('-log10(p-value) D2-DRIVE') +
     xlab('-log10(p-value) D2-comb') 
-ggsave(file.path(fig_dir, 'combined_scatter_p.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_scatter_p.png'), width = 3.5, height = 3, dpi = 350)
 
 print('Wilcox test log10_p D2_comb vs D2 Ach')
 with(bench_p, wilcox.test((D2_comb), (D2_Ach), paired = TRUE))
@@ -2548,7 +2548,7 @@ sum_stats %>% melt(id.vars = 'dset', variable.name = 'feature_relationship') %>%
     theme_Publication(base_font) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) 
 
-ggsave(file.path(fig_dir, 'combined_N_biomarks_found.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_N_biomarks_found.png'), width = 3.5, height = 3.5, dpi = 350)
 
 sum_stats %<>% mutate(total = related + same)
 temp <- sum_stats %>% as.data.frame() %>% column_to_rownames(var = 'dset') %>% t
@@ -2601,10 +2601,10 @@ ggplot(sum_stats,
     ylab('Num. dep.-feature pairs') +
     theme_Publication(base_font) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
-    theme(legend.text = element_text(size = rel(0.7))) +
-    guides(fill = guide_legend(title = element_blank(), nrow = 2)) 
+    theme(legend.text = element_text(size = rel(0.9))) +
+    guides(fill = guide_legend(title = element_blank(), nrow = 3)) 
 
-ggsave(file.path(fig_dir, 'combined_top_MDP_class.png'), width =4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_top_MDP_class.png'), width = 3.5, height = 3.5, dpi = 350)
 
 ggplot(sum_stats, 
        aes(dset, n)) +
@@ -2612,9 +2612,9 @@ ggplot(sum_stats,
     ylab('Num. dep.-feature pairs') +
     theme_Publication(base_font) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.title.x = element_blank()) +
-    theme(legend.text = element_text(size = rel(0.7))) 
+    theme(legend.text = element_text(size = rel(0.9))) 
 
-ggsave(file.path(fig_dir, 'combined_top_class_tot.png'), width =4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_top_class_tot.png'), width = 3.5, height = 3., dpi = 350)
 
 write_rds(rel_an %>% filter(!is.na(MDP)), '~/CPDS/demeter2/results/top_MDP_stats.rds')
 ```
@@ -2693,7 +2693,7 @@ ggplot(df, aes(pr)) +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication()
 
-ggsave(file.path(fig_dir, 'PR_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'PR_vs_RNAiEff.png'), width = 3.5, height = 3, dpi = 350)
 
 
 ggplot(df, aes(ssmd)) + 
@@ -2715,7 +2715,7 @@ with(df %>% filter(dset == 'GA_Ach'), cor.test(ssmd, Ach_gene_slope, method = 's
 print('GA SSMD gene slope cor, DRIVE')
 with(df %>% filter(dset == 'GA_DRIVE'), cor.test(ssmd, DRIVE_gene_slope, method = 'spearman'))
 
-ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -2763,7 +2763,7 @@ ggplot(CL_data, aes(gene_slope_Ach, gene_slope_DRIVE)) +
 print('gene slope cor Ach vs DRIVE')
 with(CL_data, cor.test(gene_slope_Ach, gene_slope_DRIVE, method = 'spearman'))
 
-ggsave(file.path(fig_dir, 'RNAi_eff_compare.png'), width = 4, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'RNAi_eff_compare.png'), width = 3.5, height = 3, dpi = 350)
 
 ```
 
@@ -2830,7 +2830,7 @@ p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
                          nrow=1),
              mylegend, nrow=2,heights=c(10, 1))
 
-ggsave(file.path(fig_dir, 'D2_corrs_smooth.png'), plot = p, width = 7, height = 3.5, dpi = 350)
+ggsave(file.path(fig_dir, 'D2_corrs_smooth.png'), plot = p, width = 6.5, height = 3., dpi = 350)
 
 ```
 
@@ -2924,7 +2924,7 @@ with(bench_res_test_spread, wilcox.test(Global_norm_DRIVE, CL_norm_DRIVE, paired
 print('N_used')
 with(bench_res_test_spread, sum(!is.na(Global_norm_DRIVE) & !is.na(CL_norm_DRIVE)))
 
-ggsave(file.path(fig_dir, 'GAnorm_benchmark_ecdf.png'), width = 5, height = 4.5, dpi = 350)
+ggsave(file.path(fig_dir, 'GAnorm_benchmark_ecdf.png'), width = 3.5, height = 3.25, dpi = 350)
 
 ```
 
@@ -2957,11 +2957,13 @@ test_SSMD %>% melt() %>%
     mutate(type = cmap[variable]) %>% 
     ggplot(aes(type, value)) +
     geom_boxplot(alpha = 0.5, outlier.shape = NA) + 
-    geom_jitter(width = 0.15, alpha = 0.75, cex = 2) +
+    geom_jitter(width = 0.0, alpha = 0.75, cex = 2) +
     ylab('Pos-neg control separation (SSMD)') +
-    theme(axis.title.x = element_blank())
+    theme_Publication() +
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(size = 12))
 
-ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 4, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 3, height = 3, dpi = 350)
 
 ```
 
@@ -2993,7 +2995,7 @@ df <- rbind(Ach_CL_data, DRIVE_CL_data) %>%
 p1 <- ggplot(df, aes(ov_slope, Doubling_time)) + 
     geom_point(alpha = 0.75) + 
     scale_y_log10() +
-    scale_x_log10() +
+    scale_x_log10(breaks = c(0.25, 0.5, 1.0, 2.0)) +
     ylab('Doubling time (hrs)') +
     xlab('Overall scale term') +
     geom_smooth(method = 'lm') +
@@ -3003,7 +3005,7 @@ p1 <- ggplot(df, aes(ov_slope, Doubling_time)) +
 p2 <- ggplot(df, aes(gene_slope, Doubling_time)) + 
     geom_point(alpha = 0.75) + 
     scale_y_log10() +
-    scale_x_log10() +
+    scale_x_log10(breaks = c(0.25, 0.5, 1.0, 2, 4)) +
     geom_smooth(method = 'lm') +
     ylab('Doubling time (hrs)') +
     xlab('Screen signal term') +
@@ -3017,7 +3019,7 @@ print('Gene slope vs doubling time cor')
 with(df, cor.test(gene_slope, Doubling_time, method = 'spearman'))
 
 cowplot::plot_grid(p1, p2, nrow=2)
-ggsave(file.path(fig_dir, 'doubling_time_scatter.png'), width = 7, height = 7, dpi = 350)
+ggsave(file.path(fig_dir, 'doubling_time_scatter.png'), width = 6, height = 6, dpi = 350)
 
 ```
 
@@ -3082,11 +3084,11 @@ hp_ssmds <- spread(cl_avgs, dset, SSMD)
 ggplot(hp_ssmds, aes(Achilles, DRIVE)) + 
     geom_point(alpha = 0.75) + 
     geom_abline() +
-    xlab('Achilles pos/neg separation (SSMD)') +
-    ylab('DRIVE pos/neg separation (SSMD)') +
+    xlab('Achilles pos/neg\nseparation (SSMD)') +
+    ylab('DRIVE pos/neg\nseparation (SSMD)') +
     theme_Publication() + 
     ggtitle('shRNA')
-ggsave(file.path(fig_dir, 'LFC_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'LFC_SSMD_compare.png'), width = 3.75, height = 3.25, dpi = 350)
 
 #compare SSMD using hps common to DRIVE and Achilles
 DRIVE_Ach_common_hps <- intersect(unique(Ach_df$barcode), unique(DRIVE_df$barcode))
@@ -3103,11 +3105,11 @@ hp_ssmds_common <- spread(cl_avgs_common, dset, SSMD)
 ggplot(hp_ssmds_common, aes(Achilles, DRIVE)) + 
     geom_point(alpha = 0.75) + 
     geom_abline() +
-    xlab('Achilles pos/neg separation (SSMD)') +
-    ylab('DRIVE pos/neg separation (SSMD)') +
+    xlab('Achilles pos/neg\nseparation (SSMD)') +
+    ylab('DRIVE pos/neg\nseparation (SSMD)') +
     theme_Publication() + 
     ggtitle('shRNA')
-ggsave(file.path(fig_dir, 'LFC_SSMD_compare_common_shRNAs.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'LFC_SSMD_compare_common_shRNAs.png'), width = 3.5, height = 3.5, dpi = 350)
 
 #compare SSMD using hps common to DRIVE and Achilles or DRIVE-only hps
 DRIVE_only_hps <- setdiff(unique(DRIVE_df$barcode), unique(Ach_df$barcode))
@@ -3148,11 +3150,11 @@ ggplot(hp_ssmd_t, aes(SSMD_diff, group = type, color = type)) +
   stat_bin(fill = 'white', alpha = 0.5, bins = 25, position = 'dodge') + 
   geom_vline(xintercept = 0, linetype = 'dashed') +
   xlim(-0.5, 0.5) +
-  guides(color = guide_legend(title = element_blank())) +
+  guides(color = guide_legend(title = element_blank(), nrow=2)) +
   xlab('SSMD difference (Achilles - DRIVE)') +
   ylab('Num cell lines') +
   theme_Publication()
-ggsave(file.path(fig_dir, 'LFC_SSMD_diff_hist.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'LFC_SSMD_diff_hist.png'), width = 3.75, height = 3.25, dpi = 350)
 
 hp_ssmd_spread <- spread(hp_ssmd_t, type, SSMD_diff)
 
@@ -3187,11 +3189,11 @@ temp_per_CL_stats %<>% dplyr::select(ssmd, CCLE_ID, dset) %>%
 ggplot(temp_per_CL_stats, aes(GA_Ach, GA_DRIVE)) + 
     geom_point(alpha = 0.75) + 
     geom_abline() +
-    xlab('Achilles pos/neg separation (SSMD)') +
-    ylab('DRIVE pos/neg separation (SSMD)') +
+    xlab('Achilles pos/neg\nseparation (SSMD)') +
+    ylab('DRIVE pos/neg\nseparation (SSMD)') +
     theme_Publication() +
     ggtitle('Gene')
-ggsave(file.path(fig_dir, 'GA_SSMD_compare.png'), width = 4.5, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'GA_SSMD_compare.png'), width = 3.5, height = 3.25, dpi = 350)
 
 print('Wilcox test GA Ach vs DRIVE')
 with(temp_per_CL_stats, wilcox.test(GA_Ach, GA_DRIVE, paired = TRUE))
@@ -3255,7 +3257,7 @@ ggplot(df, aes(dep, fill = dset)) +
     ylab('Density') +
     scale_fill_manual(values = data_type_pal) +
     theme_Publication()
-ggsave(file.path(fig_dir, 'Ach_DRIVE_gene_SD_compare.png'), width = 4., height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'Ach_DRIVE_gene_SD_compare.png'), width = 3.5, height = 3, dpi = 350)
 
 
 comb <- rbind(df %>% mutate(type = 'non_ess'), df_ess %>% mutate(type = 'ess')) %>% 
@@ -3284,7 +3286,7 @@ ggplot(temp, aes(gene_type, avg_score, fill = data_set)) +
            fill = guide_legend(title = element_blank())) +
     theme_Publication() +
     theme(axis.title.x = element_blank())
-ggsave(file.path(fig_dir, 'Ach_DRIVE_geneavg_compare.png'), width = 4., height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'Ach_DRIVE_geneavg_compare.png'), width = 3.5, height = 3, dpi = 350)
 
 # temp <- gene_avgs %>% 
 #     filter(dset %in% c('GA_DRIVE', 'GA_Ach'), gene_type == 'essential') %>% 
@@ -3313,7 +3315,7 @@ ggplot(bench_cors) +
     ylab('Dep-feature correlation\nmagnitude (DRIVE)') + 
     xlim(0, mp) + ylim(0, mp) +
     theme_Publication()
-ggsave(file.path(fig_dir, 'Ach_DRIVE_bench_compare.png'), width = 4, height = 4, dpi = 350)
+ggsave(file.path(fig_dir, 'Ach_DRIVE_bench_compare.png'), width = 3.75, height = 3.25, dpi = 350)
 
 print('Wilcox test D2 Ach vs DRIVE')
 with(bench_cors, wilcox.test(abs(D2_Ach), abs(D2_DRIVE), paired=T))
