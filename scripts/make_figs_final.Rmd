@@ -818,6 +818,8 @@ AGO2_cors <- get_matrix_vector_corrs(dep_data, target_deps, vector, use_bayes = 
 ```
 
 ```{r, fig.width=8, fig.height=5}
+AGO2_cors %<>% mutate(gene_type = plyr::revalue(gene_type, c(non_essential = 'non-essential')))
+
 cur_dset <- 'D1_Ach'
 p1 <- ggplot(AGO2_cors %>% filter(model == cur_dset), 
        aes(avg_essentiality_Ach, cor, color = gene_type)) +

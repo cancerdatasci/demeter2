@@ -409,7 +409,7 @@ make_CL_vs_avg_plot <- function(dep_name, test_CLs, gene_avgs) {
                       .[, c('Gene', 'avg_score', 'gene_type')], by = 'Gene') %>%
         # mutate(CCLE_ID = factor(CCLE_ID, levels = test_CLs))
         mutate(CL_name = str_match(CCLE_ID, '([:alnum:]+)_')[,2]) %>% 
-        mutate(plyr::revalue(gene_type, c(non_essential = 'non-essential')))
+        mutate(gene_type = plyr::revalue(gene_type, c(non_essential = 'non-essential')))
     ggplot(df, aes(avg_score, score)) +
         geom_point(alpha = 0.75, size = 0.75, color = 'grey') +
         geom_density_2d(data = filter(df, gene_type %in% c('essential', 'non-essential')),
@@ -1137,7 +1137,7 @@ scale_colour_Publication <- function(...){
 
 gene_type_pal <- c(
     essential = 'red',
-    `non_essential` = 'blue',
+    `non-essential` = 'blue',
     other = 'grey'
 )
 

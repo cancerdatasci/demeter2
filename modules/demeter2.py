@@ -276,6 +276,9 @@ class demeter:
             #LOOP OVER DATASETS AND BUILD SUBGRAPH FOR EACH
             dataset_nLLs = []
             dataset_SS = []
+            self.shRNA_R2 = []
+            self.shRNA_nLL = []
+            self.shRNA_oSS = []
             self.pred = []
             hp_offset = 0
             CL_offset = 0
@@ -295,6 +298,14 @@ class demeter:
                     cur_pred, 
                     self.eval_mask[ii],
                     CL_offset)
+                cur_shRNA_R2, cur_shRNA_nLL, cur_shRNA_SS = self.get_shRNA_R2(
+                    mod_params,
+                    self.obs[ii],
+                    cur_pred,
+                    CL_offset)
+                self.shRNA_R2.append(cur_shRNA_R2)
+                self.shRNA_nLL.append(cur_shRNA_nLL)
+                self.shRNA_oSS.append(cur_shRNA_SS)
                 dataset_nLLs.append(cur_nLL)
                 dataset_SS.append(cur_SS)
                 self.pred.append(cur_pred)
@@ -982,6 +993,24 @@ class demeter:
             ))
 
         return(cur_nLL, cur_SS)
+
+
+    def get_shRNA_R2(self, mod_params, LFC_mat, preds, CL_offset):
+        CL_batch_range = CL_offset + np.arange(LFC_mat.get_shape().as_list()[1])
+        preds_ms = preds - tf.reduce_mean(preds, axis = 1, keep_dims = True)
+        LFC_mat_ms = LFC_mat - tf.reduce_mean(LFC_mat, axis = 1, keep_dims = True)
+        cur_nLL = 0.5 * tf.reduce_sum(
+                tf.multiply(tf.pow(preds_ms - LFC_mat_ms, 2), 
+                    1/tf.reshape(tf.gather(mod_params['CL_noise_vars'], CL_batch_range), [1, -1])),
+                axis = 1)
+        
+        cur_SS = 0.5 * tf.reduce_sum(
+                tf.multiply(tf.pow(LFC_mat_ms, 2), 
+                    1/tf.reshape(tf.gather(mod_params['CL_noise_vars'], CL_batch_range), [1, -1])),
+                axis = 1)
+        cur_R2 = 1 - tf.div(cur_nLL , cur_SS)
+        return(cur_R2, cur_nLL, cur_SS)
+
 
 
     def make_sparse_submap(self, sparse_hp_mat, cur_hp_seqs):

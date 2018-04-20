@@ -81,11 +81,11 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_hp_data.csv')
 
 #gene means
 cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='gene_means_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_means_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_scores.csv')
 
 #gene SDs
 cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='gene_SDs_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_SDs_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_score_SDs.csv')
 
 
 
@@ -102,11 +102,11 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_hp_data.csv')
 
 #gene means
 cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='gene_means_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_means_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_scores.csv')
 
 #gene SDs
 cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='gene_SDs_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_SDs_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_score_SDs.csv')
 
 
 
@@ -123,11 +123,11 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_hp_data.csv')
 
 #gene means
 cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_means_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_means_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_scores.csv')
 
 #gene SDs
 cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_SDs_proc')
-write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_SDs_proc.csv')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_score_SDs.csv')
 
 
 #---------------------------------------------------------------------------------------------------------
