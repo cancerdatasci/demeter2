@@ -30,34 +30,29 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/achilles-55k-batch2-repcollapsed-lf
 #DRIVE LFC data
 #---------------------------------------------------------------------------------------------------------
 #DRIVE BFPD
-cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 9, data.file = 'BGPD_LFC_mat')
-colnames(cur_data) %<>% plyr::revalue(new_name_map) %>% plyr::revalue(CCLE_name_map)
+cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 11, data.file = 'BGPD_LFC_mat')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/drive-bgpd-lfc-mat.csv')
 
 #DRIVE poolA
-cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 9, data.file = 'poolA_LFC_mat')
-colnames(cur_data) %<>% plyr::revalue(new_name_map) %>% plyr::revalue(CCLE_name_map)
+cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 11, data.file = 'poolA_LFC_mat')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/drive-poola-lfc-mat.csv')
 
 #DRIVE poolB
-cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 9, data.file = 'poolB_LFC_mat')
-colnames(cur_data) %<>% plyr::revalue(new_name_map) %>% plyr::revalue(CCLE_name_map)
+cur_data <- load.from.taiga(data.name = 'drive-lfc-matrices-3867', data.version = 11, data.file = 'poolB_LFC_mat')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/drive-poolb-lfc-mat.csv')
 
 
 #---------------------------------------------------------------------------------------------------------
 #Marcotte LFC data
 #---------------------------------------------------------------------------------------------------------
-cur_data <- load.from.taiga(data.name = 'marcotte-lfc-data-ccle-id-d459', data.version =1)
-colnames(cur_data) %<>% plyr::revalue(new_name_map) %>% plyr::revalue(CCLE_name_map)
+cur_data <- load.from.taiga(data.name = 'marcotte-lfc-data-ccle-id-d459', data.version =2)
 write.csv(cur_data, '~/CPDS/data/D2_figshare/Marcotte_LFC_matrix.csv')
 
 
 #---------------------------------------------------------------------------------------------------------
 #shRNA mapping
 #---------------------------------------------------------------------------------------------------------
-cur_data <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=2, data.file='shmap_19mer_noXLOC')
-colnames(cur_data) %<>% plyr::revalue(new_name_map) %>% plyr::revalue(CCLE_name_map)
+cur_data <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=6, data.file='shmap_19mer_noXLOC_Entrezonly')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/shRNA-mapping.csv', row.names = FALSE)
 
 
