@@ -4,11 +4,11 @@ library(magrittr)
 library(readr)
 library(taigr)
 
-new_name_table <- read.csv('~/CPDS/demeter2/results/name_change_map.csv', check.names = FALSE, stringsAsFactors = FALSE)
-new_name_map <- new_name_table$new_name %>% set_names(new_name_table$old_name)
-
-CCLE_name_correction = read.csv('~/CPDS/demeter2/data/CCLE_name_corrections.csv', check.names = F, stringsAsFactors = F)
-CCLE_name_map <- CCLE_name_correction$new_name %>% set_names(CCLE_name_correction$old_name)
+# new_name_table <- read.csv('~/CPDS/demeter2/results/name_change_map.csv', check.names = FALSE, stringsAsFactors = FALSE)
+# new_name_map <- new_name_table$new_name %>% set_names(new_name_table$old_name)
+# 
+# CCLE_name_correction = read.csv('~/CPDS/demeter2/data/CCLE_name_corrections.csv', check.names = F, stringsAsFactors = F)
+# CCLE_name_map <- CCLE_name_correction$new_name %>% set_names(CCLE_name_correction$old_name)
 
 #---------------------------------------------------------------------------------------------------------
 #Achilles LFC data
@@ -72,19 +72,19 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/Hart-neg-controls.csv', row.names =
 #D2 Achilles model fit
 #---------------------------------------------------------------------------------------------------------
 #CL data
-cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='CL_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_CL_data.csv')
 
 #hp data
-cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='hp_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='hp_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_hp_data.csv')
 
 #gene means
-cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='gene_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='gene_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_scores.csv')
 
 #gene SDs
-cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=10, data.file='gene_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_score_SDs.csv')
 
 
@@ -93,19 +93,19 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_score_SDs.csv'
 #D2 DRIVE model fit
 #---------------------------------------------------------------------------------------------------------
 #CL data
-cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='CL_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_CL_data.csv')
 
 #hp data
-cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='hp_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='hp_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_hp_data.csv')
 
 #gene means
-cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='gene_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='gene_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_scores.csv')
 
 #gene SDs
-cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=8, data.file='gene_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_score_SDs.csv')
 
 
@@ -114,19 +114,19 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_score_SDs.csv')
 #D2 Combined model fit
 #---------------------------------------------------------------------------------------------------------
 #CL data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='CL_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_CL_data.csv')
 
 #hp data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='hp_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='hp_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_hp_data.csv')
 
 #gene means
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='gene_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_scores.csv')
 
 #gene SDs
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=8, data.file='gene_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_score_SDs.csv')
 
 

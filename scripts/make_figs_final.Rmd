@@ -41,7 +41,8 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/figures'
+# fig_dir <- '~/CPDS/demeter2/results/figures'
+fig_dir <- '~/Desktop/D2_figures_test'
 temp_file_suffix <- 'oldreg'
 base_font <- 12 #font size for figs
 
@@ -126,7 +127,7 @@ hart_non_ess <- load.from.taiga(data.name='demeter2-pos-neg-controls-a5c6', data
 
 load('~/CPDS/data/CCLE/Annotations.RData')
 
-sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=2, data.file = 'shmap_19mer_noXLOC')
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=6, data.file = 'shmap_19mer_noXLOC_Entrezonly')
 Gene_ID_to_symb <- sh_targets %>% 
     filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
     filter(grepl('[0-9]', `Gene ID`)) %>% 
@@ -145,8 +146,8 @@ related_genes <- load.from.taiga(data.name='related-features-dcbd', data.version
 CRISPR_benchmarks <- read.csv('~/CPDS/demeter2/results/top_CRISPR_biomarkers.csv', stringsAsFactors = F, check.names = F) %>% 
     mutate()
 
-new_name_table <- read.csv('~/CPDS/demeter2/results/name_change_map.csv', check.names = FALSE, stringsAsFactors = FALSE)
-new_name_map <- new_name_table$new_name %>% set_names(new_name_table$old_name)
+# new_name_table <- read.csv('~/CPDS/demeter2/results/name_change_map.csv', check.names = FALSE, stringsAsFactors = FALSE)
+# new_name_map <- new_name_table$new_name %>% set_names(new_name_table$old_name)
 
 ```
 
@@ -168,7 +169,7 @@ export_fig <- function(fig_name, width, height, type = 'png', plot = NULL) {
 
 ```{r, include = FALSE}
 dep_dnames <- names(dep_datasets) %>% set_names(names(dep_datasets))
-dep_data <- load_all_dep_data(dep_dnames, dep_datasets, include_gene_families = include_gene_families, use_bayes = use_bayes, name_map = new_name_map)
+dep_data <- load_all_dep_data(dep_dnames, dep_datasets, include_gene_families = include_gene_families, use_bayes = use_bayes, name_map = NULL)
 if (colnames(dep_data$D1_Marc$gene_scores)[1] %in% sh_targets$`Gene Symbol`) {
     colnames(dep_data$D1_Marc$gene_scores) <- Gene_symb_to_ID[colnames(dep_data$D1_Marc$gene_scores)]
 }
@@ -378,10 +379,10 @@ for (cur_dset in names(dep_datasets)) {
 ```{r}
 #load CL data for Achilles and DRIVE
 Ach_CL_data <- read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F, check.names=F)
-Ach_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
+# Ach_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
 
 DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F, check.names = F)
-DRIVE_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
+# DRIVE_CL_data %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, new_name_map, warn_missing = F))
 
 ```
 
@@ -1685,7 +1686,7 @@ avg_unc <- data.frame(
     CCLE_ID = rownames(dep_data$D2_Ach$gene_scores),
     avg_sd = sqrt(rowMeans(dep_data$D2_Ach$gene_score_SDs^2, na.rm=T))
 ) %>% left_join(Ach_CL_data, by = "CCLE_ID")
-Ach_rep_cors <- read.csv('~/CPDS/demeter2/results/Ach_rep_cors.csv', stringsAsFactors = F, check.names = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
+Ach_rep_cors <- read.csv('~/CPDS/demeter2/results/Ach_rep_cors.csv', stringsAsFactors = F, check.names = F)
 unc_df <- per_CL_stats %>% 
     filter(dset == 'GA_Ach') %>% 
     inner_join(avg_unc, by = 'CCLE_ID') %>% 
@@ -2724,15 +2725,14 @@ ggsave(file.path(fig_dir, 'SSMD_vs_RNAiEff.png'), width = 3.5, height = 3, dpi =
 ### S2: Agreement between Achilles and DRIVE RNAi efficacy estimates
 
 ```{r, fig.width=5, fig.height=4}
-DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
-Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
+DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) 
+Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F)
 
-Marc_CL_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = clean_CL_names_with_missing(CCLE_ID),
-               CCLE_ID = revalue(CCLE_ID, new_name_map))
+Marc_CL_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = clean_CL_names_with_missing(CCLE_ID))
 
-Ach_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
-DRIVE_CL_batch_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
-Marc_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map))
+Ach_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) 
+DRIVE_CL_batch_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F) 
+Marc_CL_batch_data <-read.csv(file.path(dep_datasets$D2_Marc$path, 'CL_batch_data.csv'), stringsAsFactors = F) 
 Marc_CL_batch_data %<>% mutate(CCLE_ID = clean_CL_names_with_missing(CCLE_ID))
 
 Ach_CL_slope <- Ach_CL_batch_data %>% 
@@ -2972,16 +2972,14 @@ ggsave(file.path(fig_dir, 'SSMD_xval.png'), width = 3, height = 3, dpi = 350)
 ## S6 Scale param v doubling time
 
 ```{r}
-Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
-    left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv')) %>% 
-         mutate(CCLE_ID = revalue(CCLE_ID, new_name_map), stringsAsFactors = F) %>% 
+Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% 
+    left_join(read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
     group_by(CCLE_ID) %>% 
     summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% 
     mutate(dset = 'Achilles')
 
-DRIVE_CL_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>% mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
+DRIVE_CL_data <-read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>% 
     left_join(read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_batch_data.csv'), stringsAsFactors = F) %>% 
-             mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
     group_by(CCLE_ID) %>% 
     summarise(ov_slope = mean(CL_slope, na.rm=T)), by = 'CCLE_ID') %>% mutate(dset = 'DRIVE')
 
@@ -2990,7 +2988,6 @@ df <- rbind(Ach_CL_data, DRIVE_CL_data) %>%
         read_csv('~/CPDS/data/Achilles/shRNA/TableS1_SampleInfo.csv') %>% 
             dplyr::select(CCLE_ID = Name, Passage = `Passage number`, Days = `Days in culture`, Doubling_time = `Doubling time (hrs)`)) %>% 
     filter(!grepl('>', Doubling_time)) %>% 
-  mutate(CCLE_ID = revalue(CCLE_ID, new_name_map)) %>% 
     mutate(Doubling_time = as.numeric(str_replace_all(Doubling_time, '[ hrs]', ''))) %>% 
     mutate(num_doublings = Days*24/Doubling_time)
     
@@ -3032,9 +3029,9 @@ CE_bc <- filter(sh_targets, `Gene ID` %in% hart_ess) %>% .[['Barcode Sequence']]
 NE_bc <- filter(sh_targets, `Gene ID` %in% hart_non_ess) %>% .[['Barcode Sequence']]
 used_bc <- unique(c(CE_bc, NE_bc))
 
-BGPD.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='BGPD_LFC_mat')
-poolA.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='poolA_LFC_mat')
-poolB.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=9, data.file='poolB_LFC_mat')
+BGPD.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=11, data.file='BGPD_LFC_mat')
+poolA.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=11, data.file='poolA_LFC_mat')
+poolB.LFC.mat <- load.from.taiga(data.name='drive-lfc-matrices-3867', data.version=11, data.file='poolB_LFC_mat')
 
 Ach_98k <- load.from.taiga(data.name = 'achilles-98k-repcollapsed-lfc-19ce', data.version = 1)
 Ach_55k1 <- load.from.taiga(data.name = 'achilles-55k-batch1-repcollapsed-lfc-d708', data.version = 1)

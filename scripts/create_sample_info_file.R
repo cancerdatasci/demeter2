@@ -4,18 +4,18 @@ library(magrittr)
 library(readr)
 library(taigr)
 
-CCLE_name_correction = read.csv('~/CPDS/demeter2/data/CCLE_name_corrections.csv', check.names = F, stringsAsFactors = F)
-CCLE_name_map <- CCLE_name_correction$new_name %>% set_names(CCLE_name_correction$old_name)
+# CCLE_name_correction = read.csv('~/CPDS/demeter2/data/CCLE_name_corrections.csv', check.names = F, stringsAsFactors = F)
+# CCLE_name_map <- CCLE_name_correction$new_name %>% set_names(CCLE_name_correction$old_name)
 
 lineage_info <- load.from.taiga(data.name='lineage-f95f', data.version=5) %>% 
   dplyr::rename(CCLE_ID = CCLE_name,
                 disease = primary_tissue,
                 disease_subtype = secondary_tissue,
                 disease_sub_subtype = tertiary_tissue)
-Marc_CL_data <- load.from.taiga(data.name='demeter2-marcotte-a703', data.version=5, data.file='CL_data_comb')
-DRIVE_CL_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=7, data.file='CL_data_comb')
-Ach_CL_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=9, data.file='CL_data_comb')
-Comb_CL_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=6, data.file='CL_data_comb')
+Marc_CL_data <- load.from.taiga(data.name='demeter2-marcotte-a703', data.version=8, data.file='CL_data_comb')
+DRIVE_CL_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='CL_data_comb')
+Ach_CL_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='CL_data_comb')
+Comb_CL_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='CL_data_comb')
 
 sample_info <- data.frame(CCLE_ID = rownames(Comb_CL_data)) %>% 
   left_join(lineage_info, by = 'CCLE_ID') %>% 
@@ -53,6 +53,6 @@ Marcotte_annot <- read_tsv('~/CPDS/data/Marcotte/cell_line_subtypes.txt') %>%
 sample_info %<>% left_join(Marcotte_annot, by = 'CCLE_ID')
 sample_info %<>% mutate(disease = ifelse(in_Marcotte & is.na(disease), 'breast', disease))
 
-sample_info %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, CCLE_name_map))
+# sample_info %<>% mutate(CCLE_ID = plyr::revalue(CCLE_ID, CCLE_name_map))
 
 write.csv(sample_info, '~/CPDS/data/D2_figshare/sample_info.csv', row.names = FALSE)
