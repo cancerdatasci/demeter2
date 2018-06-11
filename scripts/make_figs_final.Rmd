@@ -41,9 +41,9 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-# fig_dir <- '~/CPDS/demeter2/results/figures'
-fig_dir <- '~/Desktop/D2_figures_test'
-temp_file_suffix <- 'oldreg'
+fig_dir <- '~/CPDS/demeter2/results/rev_figures'
+# fig_dir <- '~/Desktop/D2_figures_test'
+temp_file_suffix <- ''
 base_font <- 12 #font size for figs
 
 ###PARAMETERS
@@ -2892,7 +2892,6 @@ target_dsets <- c('GA_Ach', 'GAPN_Ach', 'GA_DRIVE', 'GAPN_DRIVE')
 names(target_dsets) <- c('Global_norm_Achilles', 'CL_norm_Achilles',
 'Global_norm_DRIVE', 'CL_norm_DRIVE')
 
-
 cur_gene_set <- NULL
 cur_CL_set <- NULL
 bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set)
@@ -3326,4 +3325,243 @@ with(bench_cors, median((abs(GA_DRIVE) - abs(GA_Ach))/abs(GA_Ach), na.rm=T))
 print('N_used')
 with(bench_cors, sum(!is.na(GA_DRIVE) & !is.na(GA_Ach)))
 ```
+
+
+
+<!-- ```{r} -->
+<!-- #analyze calibration of uncertainty estimates using distribution of t-stats for negative control genes -->
+<!-- ncons <- as.character(hart_non_ess) -->
+<!-- cur_SDs <- dep_data$D2_Ach$gene_score_SDs[, ncons[ncons %in% colnames(dep_data$D2_Ach$gene_score_SDs)]] -->
+<!-- cur_means <- dep_data$D2_Ach$gene_scores[, ncons[ncons %in% colnames(dep_data$D2_Ach$gene_scores)]] -->
+<!-- cur_t_stats <- cur_means/cur_SDs -->
+<!-- plot(Ach_CL_data$gene_slope, apply(cur_t_stats, 1, sd, na.rm=T)) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- #merge gene dep matrices -->
+<!-- GA_qnorm <- merge(dep_data$GA_Ach$gene_scores, dep_data$GA_DRIVE$gene_scores, all = TRUE) %>%  -->
+<!--   merge(dep_data$GA_Marc$gene_scores, all = TRUE) -->
+<!-- GA_qnorm <- normalizeQuantiles(t(GA_qnorm)) %>% t() -->
+
+<!-- CL_names <- c(rownames(dep_data$GA_Ach$gene_scores), -->
+<!--               rownames(dep_data$GA_DRIVE$gene_scores), -->
+<!--               rownames(dep_data$GA_Marc$gene_scores)) -->
+<!-- unique_CLs <- unique(CL_names) -->
+<!-- GA_qnorm_mat <- matrix(NA, nrow = length(unique_CLs), ncol = ncol(GA_qnorm)) -->
+<!-- rownames(GA_qnorm_mat) <- unique_CLs -->
+<!-- colnames(GA_qnorm_mat) <- colnames(GA_qnorm) -->
+<!-- for (cur_CL in unique_CLs) { -->
+<!--   GA_qnorm_mat[cur_CL,] <- colMeans(GA_qnorm[CL_names == cur_CL,, drop=F], na.rm=T)     -->
+<!-- } -->
+
+<!-- GA_qnorm_mat[is.na(GA_qnorm_mat)] <- NA -->
+<!-- qGA_pcs <- pcaMethods::pca(GA_qnorm_mat, -->
+<!--                           method = 'ppca', -->
+<!--                           nPCs = 2, -->
+<!--                           scale = 'none', -->
+<!--                           center = center) -->
+<!-- qGA_R2sum <- pcaMethods::R2cum(qGA_pcs) -->
+<!-- qGA_pcs <- pcaMethods::scores(qGA_pcs) -->
+
+<!-- ``` -->
+
+### PCA projection of D1
+
+```{r}
+#project out first PC of D1 data
+center <- TRUE
+nPcs <- 20
+D1_pcs <- pcaMethods::pca(dep_data$D1_Ach$gene_scores,
+                          method = 'ppca',
+                          nPcs = nPcs,
+                          scale = 'none',
+                          center = center)
+
+imp_mat <- pcaMethods::completeObs(D1_pcs)
+first_PC_D1_Ach <- pcaMethods::scores(D1_pcs)[,1] #first PC
+first_PC_D1_Ach <- matrix(first_PC_D1_Ach/sqrt(sum(first_PC_D1_Ach^2, na.rm=T)), ncol = 1)
+proj_mat <- first_PC_D1_Ach %*% t(first_PC_D1_Ach)
+proj_D1_data <- imp_mat - proj_mat %*% imp_mat
+rownames(proj_D1_data) <- rownames(dep_data$D1_Ach$gene_scores)
+colnames(proj_D1_data) <- colnames(dep_data$D1_Ach$gene_scores)
+
+dep_data$D1PC_Ach <- list(gene_scores = proj_D1_data, 
+                            mod_type = 'D1',
+                            dataset = 'Ach', 
+                            type = 'rel')
+
+
+D1_DRIVE_pcs <- pcaMethods::pca(dep_data$D1_DRIVE$gene_scores,
+                          method = 'ppca',
+                          nPcs = nPcs,
+                          scale = 'none',
+                          center = center)
+
+imp_mat <- pcaMethods::completeObs(D1_DRIVE_pcs)
+first_PC_D1_DRIVE <- pcaMethods::scores(D1_DRIVE_pcs)[,1] #first PC
+first_PC_D1_DRIVE <- matrix(first_PC_D1_DRIVE/sqrt(sum(first_PC_D1_DRIVE^2, na.rm=T)), ncol = 1)
+proj_mat <- first_PC_D1_DRIVE %*% t(first_PC_D1_DRIVE)
+proj_D1_data <- imp_mat - proj_mat %*% imp_mat
+rownames(proj_D1_data) <- rownames(dep_data$D1_DRIVE$gene_scores)
+colnames(proj_D1_data) <- colnames(dep_data$D1_DRIVE$gene_scores)
+
+dep_data$D1PC_DRIVE <- list(gene_scores = proj_D1_data, 
+                            mod_type = 'D1',
+                            dataset = 'DRIVE', 
+                            type = 'rel')
+```
+
+```{r}
+DRIVE_CL_data <- read.csv(file.path(dep_datasets$D2_DRIVE$path, 'CL_data.csv'), stringsAsFactors = F) %>% 
+  left_join(data.frame(
+    CCLE_ID = rownames(dep_data$D1_DRIVE$gene_scores),
+    PC = first_PC_D1_DRIVE[,1]
+  ), by = 'CCLE_ID')
+
+Ach_CL_data <-read.csv(file.path(dep_datasets$D2_Ach$path, 'CL_data.csv'), stringsAsFactors = F) %>% 
+  left_join(data.frame(
+    CCLE_ID = rownames(dep_data$D1_Ach$gene_scores),
+    PC = first_PC_D1_Ach[,1]
+  ), by = 'CCLE_ID')
+
+g1 <- ggplot(Ach_CL_data, aes(gene_slope, PC)) + 
+  geom_point(alpha = 0.75) +
+  xlab('Screen signal') + ylab('First PC loading') +
+  theme_Publication() +
+  ggtitle('Achilles')
+g2 <- ggplot(DRIVE_CL_data, aes(gene_slope, PC)) + 
+  geom_point(alpha = 0.75) +
+  xlab('Screen signal') + ylab('First PC loading') +
+  theme_Publication() +
+  ggtitle('DRIVE')
+p <- plot_grid(g1, g2, nrow = 1)
+
+export_fig('PC_screen_signal_compare', width = 7, height = 3.5, plot = p)
+
+```
+
+```{r}
+vector <- feature_data$GE[, '27161'] %>% set_names(rownames(feature_data$GE))
+
+target_deps <- c('D1_Ach', 'D1PC_Ach', 'D1_DRIVE', 'D1PC_DRIVE',
+                       'GA_Ach', 'GAPN_Ach', 'GA_DRIVE', 'GAPN_DRIVE',
+                       'D2_Ach', 'D2_DRIVE')
+
+gene_avgs <- get_gene_avgs(dep_data, names(dep_datasets), hart_ess, hart_non_ess, use_bayes = use_bayes) %>% 
+    mutate(Gene = as.character(Gene))
+
+AGO2_cors <- get_matrix_vector_corrs(dep_data, target_deps, vector, use_bayes = use_bayes) %>% 
+    mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess)) %>% 
+    left_join(gene_avgs %>% 
+         filter(dset == 'D2_Ach') %>% 
+         dplyr::select(Gene, avg_essentiality_Ach = avg_score), 
+     by = "Gene") %>% 
+    left_join(gene_avgs %>% 
+         filter(dset == 'D2_DRIVE') %>% 
+         dplyr::select(Gene, avg_essentiality_DRIVE = avg_score), 
+     by = "Gene")
+
+AGO2_cors %<>% mutate(gene_type = plyr::revalue(gene_type, c(non_essential = 'non-essential'))) %>% mutate(mod = str_match(model, '([:alnum:]+)_[:alnum:]+')[,2],
+                      dat = str_match(model, '[:alnum:]+_([:alnum:]+)')[,2],
+                      mod = factor(mod, levels = c('D2', 'D1', 'D1PC', 'GA', 'GAPN')))
+
+p1 <- ggplot(AGO2_cors %>% filter(grepl("Ach", model)), 
+       aes(avg_essentiality_Ach, cor, color = mod)) + 
+    geom_smooth(se = TRUE, alpha = 0.2, lwd = 1) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.4, 0.15)) +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Model', nrow = 2, override.aes = list(lwd = 3))) +
+    # scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    ggtitle('Achilles') 
+
+p2 <- ggplot(AGO2_cors %>% filter(grepl("DRIVE", model)), 
+       aes(avg_essentiality_DRIVE, cor, color = mod)) + 
+    geom_smooth(se = TRUE, alpha = 0.2, lwd = 1) +
+    coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(-0.4, 0.15)) +
+    ylab('Dependency correlation\nwith AGO2 GE') + 
+    xlab('Cell line avg. dependency score') +
+    guides(color = guide_legend(title = 'Model', nrow = 2, override.aes = list(lwd = 3))) +
+    # scale_color_manual(values = mod_type_pal) +
+    theme_Publication(base_font) +
+    ggtitle('DRIVE')
+
+mylegend <- g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+export_fig('norm_methods_AGO2_corrs', width = 7, height = 3.5, plot = p)
+
+```
+
+
+```{r}
+# target_dsets <- c('D1_Ach', 'D1PC_Ach', 'D2_Ach', 'D1_DRIVE', 'D1PC_DRIVE', 'D2_DRIVE', 'GA_Ach', 'GAPN_Ach', 'GA_DRIVE', 'GAPN_DRIVE')
+target_dsets <- c('D1_Ach', 'D1PC_Ach', 'D1_DRIVE', 'D1PC_DRIVE', 'GA_Ach', 'GAPN_Ach', 'GA_DRIVE', 'GAPN_DRIVE')
+
+cur_gene_set <- NULL
+cur_CL_set <- NULL
+bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set) %>% 
+  mutate(mod = str_match(model, '(.+)_')[,2])
+
+p1 <- ggplot(bench_res_test %>% filter(grepl('Ach', model)),
+       aes(abs(cor), color = mod)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlab('Correlation magnitude |r|') +
+    ylab('CDF') +
+    xlim(0.6, 0) +
+    ylim(0, 1) +
+    guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3))) + 
+    # scale_color_manual(values = data_type_pal) +
+    # scale_colour_Publication() +
+    ggtitle('Achilles') +
+    theme_Publication() 
+
+p2 <- ggplot(bench_res_test %>% filter(grepl('DRIVE', model)),
+       aes(abs(cor), color = mod)) + 
+    stat_ecdf(size = 0.6) +
+    scale_x_reverse() +
+    xlab('Correlation magnitude |r|') +
+    ylab('CDF') +
+    xlim(0.6, 0) +
+    ylim(0, 1) +
+    guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3))) + 
+    # scale_color_manual(values = data_type_pal) +
+    # scale_colour_Publication() +
+    ggtitle('DRIVE') + 
+    theme_Publication() 
+
+mylegend <- g_legend(p1)
+
+p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
+                         p2 + theme(legend.position="none"),
+                         nrow=1),
+             mylegend, nrow=2,heights=c(10, 1))
+
+export_fig('norm_methods_CRISPR_benchcors', width = 7, height = 3.5, plot = p)
+
+bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(cor, model, Dep_Gene_ID) %>% mutate(cor = abs(cor)) %>% 
+                                  distinct(model, Dep_Gene_ID, .keep_all=T), model, cor)
+
+print('Wilcox test D1 Ach vs PCN')
+with(bench_res_test_spread, wilcox.test(D1_Ach, D1PC_Ach, paired = TRUE))
+with(bench_res_test_spread, median(D1_Ach - D1PC_Ach, na.rm=T))
+print('N_used')
+with(bench_res_test_spread, sum(!is.na(D1PC_Ach) & !is.na(D1_Ach)))
+
+print('Wilcox test D1 DRIVE vs PCN')
+with(bench_res_test_spread, wilcox.test(D1_DRIVE, D1PC_DRIVE, paired = TRUE))
+with(bench_res_test_spread, median(D1_DRIVE - D1PC_DRIVE, na.rm=T))
+print('N_used')
+with(bench_res_test_spread, sum(!is.na(D1PC_DRIVE) & !is.na(D1_DRIVE)))
+
+```
+
 

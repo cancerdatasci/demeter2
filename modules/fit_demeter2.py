@@ -173,7 +173,7 @@ if not (np.isinf(args.max_genes) and np.isinf(args.max_CLs)):
         used_CLs = np.random.choice(data['unique_CLs'], size = n_CL_sample, replace = False)
     else:
         used_CLs = data['unique_CLs']
-    new_dsets = [LFC_mat.ix[np.in1d(LFC_mat.index.values, used_hp_seqs),np.in1d(LFC_mat.columns.values, used_CLs)] for LFC_mat in data['LFC_mats']]
+    new_dsets = [LFC_mat.ix[np.in1d(LFC_mat.index.values, used_hp_seqs),np.in1d(LFC_mat.columns.values, used_CLs)] for LFC_mat in data['LFC_mats'] if np.any(np.in1d(LFC_mat.columns.values, used_CLs))]
     data = preprocess.make_demeter2_data(new_dsets, sh_targets)
 
 data_names = {'genes': data['unique_genes'],
