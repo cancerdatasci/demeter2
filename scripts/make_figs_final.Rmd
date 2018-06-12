@@ -78,34 +78,34 @@ dep_datasets <- list(
                    taiga_file = 'ExpandedGeneZSolsCleaned'),
     D1_Ach = list(mod_type = 'D1', dataset = 'Ach', type = 'rel',
                    taiga_name = 'achilles-demeter-1-scores-3de4',
-                   taiga_version = 3),
+                   taiga_version = 4),
     D1_DRIVE = list(mod_type = 'D1', dataset = 'DRIVE', type = 'rel',
                    taiga_name = 'drive-demeter-1-scores-e811',
-                   taiga_version = 5),
+                   taiga_version = 6),
     ATARiS_Ach = list(mod_type = 'ATARiS', dataset = 'Ach', type = 'rel',
                       taiga_name = 'achilles-ataris-scores-12c6', 
-                      taiga_version = 5),
+                      taiga_version = 6),
     ATARiS_DRIVE = list(mod_type = 'ATARiS', dataset = 'DRIVE', type = 'rel',
                       taiga_name = 'drive-ataris-scores-1988', 
-                      taiga_version = 6),
+                      taiga_version = 7),
     GA_Ach = list(mod_type = 'GA', dataset = 'Ach', type = 'abs',
                    taiga_name = 'achilles-gene-averaging-matrices-608b',
-                   taiga_version = 10),
+                   taiga_version = 11),
     GA_DRIVE = list(mod_type = 'GA', dataset = 'DRIVE', type = 'abs',
                    taiga_name = 'drive-gene-averaging-matrices-d967',
-                   taiga_version = 12),
+                   taiga_version = 13),
     GA_Marc = list(mod_type = 'GA', dataset = 'Marcotte', type = 'abs',
                    taiga_name = 'marcotte-gene-averaging-matrix-6bcb',
-                   taiga_version = 5),
+                   taiga_version = 6),
     GA_comb = list(mod_type = 'GA', dataset = 'comb', type = 'abs',
                taiga_name = 'gene-average-9c95',
-               taiga_version = 8),
+               taiga_version = 9),
     RSA_Ach = list(mod_type = 'RSA', dataset = 'Ach', type = 'abs',
                    taiga_name = 'achilles-rsa-scores-855d',
-                   taiga_version = 5),
+                   taiga_version = 6),
     RSA_DRIVE = list(mod_type = 'RSA', dataset = 'DRIVE', type = 'abs',
                    taiga_name = 'drive-rsa-scores-f57d',
-                   taiga_version = 9),
+                   taiga_version = 12),
     CERES_CRISPR = list(mod_type = 'CERES', dataset = 'CRISPR', type = 'abs',
                  taiga_name = 'avana-public-tentative-18q1-92d9',
                  taiga_version = 5,
@@ -398,6 +398,7 @@ gene_SDs <- get_gene_SDs(dep_data, names(dep_datasets), hart_ess, hart_non_ess, 
 
 gene_avgs_wide <- spread(gene_avgs, dset, avg_score)
 ```
+
 
 ```{r, include = FALSE}
 #Compute SSMD of pos-neg controls for each dataset
@@ -1488,7 +1489,8 @@ bench_res <- get_target_biomarker_dep_cors(target_dsets,
                                            CRISPR_benchmarks,
                                            feature_data,
                                            cur_gene_set,
-                                           cur_CL_set)
+                                           cur_CL_set,
+                                           use_bayes = use_bayes)
 
 # bench_res <- get_target_biomarker_dep_cors(target_dsets, curated_benchmarks, feature_data, cur_gene_set, cur_CL_set)
 
@@ -2197,8 +2199,8 @@ CRISPR_cors %<>% left_join(gene_avgs %>%
 Similar improvements with the combined D2 dataset over D2 on either dataset alone were observed when comparing the agreement of gene dependency profiles with CRISPR.
 
 ```{r, fig.width=5, fig.height=4}
-dset_map <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', CERES_CRISPR = 'CRISPR')
-ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% 
+dset_map <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', CERES_CRISPR = 'CRISPR', D2_comb2 = 'D2 comb2')
+ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D2_comb2')) %>% 
            mutate(dset = dset_map[dset]), 
        aes(avg_essentiality, cor, color = dset)) + 
     geom_smooth(lwd = 0.5) +
@@ -2230,13 +2232,31 @@ ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 3.5, heigh
 ```
 
 
+```{r}
+
+SD_offset <- 0.05
+dep_data$D2_comb2 <- dep_data$D2_comb
+# cur_prec <- 1/dep_data$D2_comb2$gene_score_SDs^2
+# in_DRIVE_CLs <- rownames(cur_prec) %in% DRIVE_CLs
+# cur_prec[in_DRIVE_CLs,] <- scale(cur_prec[in_DRIVE_CLs,], center = FALSE, scale = colSums(cur_prec[in_DRIVE_CLs,], na.rm=T))
+# cur_prec[!in_DRIVE_CLs,] <- scale(cur_prec[!in_DRIVE_CLs,], center = FALSE, scale = colSums(cur_prec[!in_DRIVE_CLs,], na.rm=T))
+# dep_data$D2_comb2$gene_score_SDs <- sqrt(1/cur_prec)
+dep_data$D2_comb2$gene_score_SDs <- sqrt(dep_data$D2_comb$gene_score_SDs^2 + SD_offset^2)
+# dep_data$D2_comb2$gene_score_SDs <- matrix(1, nrow = nrow(dep_data$D2_comb$gene_scores), ncol = ncol(dep_data$D2_comb$gene_scores)) %>%
+#   set_colnames(colnames(dep_data$D2_comb$gene_scores)) %>%
+  # set_rownames(rownames(dep_data$D2_comb$gene_scores))
+
+```
+
+
 ```{r, include = FALSE}
-target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D2_comb2')
 bench_res_overlap <- get_target_biomarker_dep_cors(target_dsets, 
                                                     CRISPR_benchmarks, 
                                                     feature_data, 
                                                    RNAi_common_genes, 
-                                                   RNAi_common_CLs)
+                                                   RNAi_common_CLs,
+                                                   use_bayes = use_bayes)
 
 bench_cors_overlap <- bench_res_overlap %>% 
     dplyr::select(-p.value) %>% 
@@ -2633,7 +2653,7 @@ spread(sum_stats, dset,n) %>% DT::datatable()
 <!-- target_dsets <- c('D2_comb', 'CERES_CRISPR') -->
 <!-- cur_gene_set <- NULL -->
 <!-- cur_CL_set <- NULL -->
-<!-- bench_res <- get_target_biomarker_dep_cors(target_dsets, curated_benchmarks, feature_data, cur_gene_set, cur_CL_set) -->
+<!-- bench_res <- get_target_biomarker_dep_cors(target_dsets, curated_benchmarks, feature_data, cur_gene_set, cur_CL_set, use_bayes = use_bayes) -->
 
 <!-- bench_cors <- bench_res %>% -->
 <!--     dplyr::select(-p.value) %>% -->
@@ -2894,7 +2914,7 @@ names(target_dsets) <- c('Global_norm_Achilles', 'CL_norm_Achilles',
 
 cur_gene_set <- NULL
 cur_CL_set <- NULL
-bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set)
+bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set, use_bayes = use_bayes)
 map_names <- names(target_dsets) %>% set_names(target_dsets)
 bench_res_test %<>% mutate(model = map_names[model],
                            norm_type = ifelse(grepl('CL_norm', model), 'Per cell line norm', 'Global norm'),
@@ -3507,7 +3527,7 @@ target_dsets <- c('D1_Ach', 'D1PC_Ach', 'D1_DRIVE', 'D1PC_DRIVE', 'GA_Ach', 'GAP
 
 cur_gene_set <- NULL
 cur_CL_set <- NULL
-bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set) %>% 
+bench_res_test <- get_target_biomarker_dep_cors(target_dsets, CRISPR_benchmarks, feature_data, cur_gene_set, cur_CL_set, use_bayes = use_bayes) %>% 
   mutate(mod = str_match(model, '(.+)_')[,2])
 
 p1 <- ggplot(bench_res_test %>% filter(grepl('Ach', model)),
@@ -3545,7 +3565,7 @@ p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
                          nrow=1),
              mylegend, nrow=2,heights=c(10, 1))
 
-export_fig('norm_methods_CRISPR_benchcors', width = 7, height = 3.5, plot = p)
+export_fig('norm_methods_CRISPR_benchcors', width = 7, height = 4, plot = p)
 
 bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(cor, model, Dep_Gene_ID) %>% mutate(cor = abs(cor)) %>% 
                                   distinct(model, Dep_Gene_ID, .keep_all=T), model, cor)

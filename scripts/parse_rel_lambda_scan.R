@@ -35,6 +35,10 @@ R2_res %>% arrange(desc(test_R2)) %>% head(1) %>%
 ggplot(R2_res, aes(log10(rel_gene_l2_lambda), log10(rel_seed_l2_lambda), fill = test_R2)) + 
     geom_raster()
 
+ggplot(R2_res, aes(log10(rel_gene_l2_lambda), log10(rel_seed_l2_lambda), fill = train_R2)) + 
+  geom_raster()
+
+
 cat('Optimal test R2 mean-sub:\n')
 R2_res %>% arrange(desc(test_R2_ms)) %>% head(1) %>% 
     dplyr::select(test_R2_ms, rel_gene_l2_lambda, rel_seed_l2_lambda, gene_l2_lambda, rel_gene_l2_lambda)

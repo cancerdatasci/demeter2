@@ -912,7 +912,7 @@ data_available <- function(feature_genes, feature_types, feature_data) {
     return(is_avail)
 }
 
-get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_data, gene_set = NULL, CL_set = NULL) {
+get_target_biomarker_dep_cors <- function(target_dsets, benchmark_set, feature_data, gene_set = NULL, CL_set = NULL, use_bayes = TRUE) {
     #evaluate correlations for a set of benchmark dep-biomarker relationships
     if (!is.null(gene_set)) {
         benchmark_set %<>% filter(Dep_Gene_ID %in% gene_set)

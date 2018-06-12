@@ -47,6 +47,7 @@ parser.add_argument("--print_freq", help="Print progress per n iterations", type
 parser.add_argument("--random_seed", help="random seed", type = int, default = 0)
 parser.add_argument("--ML_gene_slope", dest = 'ML_gene_slope', help="use ML estimate for gene slopes", action = 'store_true')
 parser.add_argument("--float_precision", dest = 'float_precision', help="set float precision ('single' or 'double')", default = 'double')
+parser.add_argument("--no_shRNA_effs", dest = 'fit_shRNA_effs', help="dont fit shRNA efficacy terms", action = 'store_false')
 
 parser.set_defaults(zscore=False)
 parser.set_defaults(fit_edward=True)
@@ -226,7 +227,8 @@ if fit_CL_slopes:
     mod.init_slopes(data['LFC_mats'])
 
 def fit_iter(ignore_test = False):
-    mod.fit(data['LFC_mats'], fit_params = 'guide_effs', ignore_test = ignore_test) #estimate seed region weights
+    if args.fit_shRNA_effs:
+        mod.fit(data['LFC_mats'], fit_params = 'guide_effs', ignore_test = ignore_test) #estimate hairpin efficacies
     if args.ML_gene_slope:
         mod.fit(data['LFC_mats'], fit_params = 'gene_slopes_ML', ignore_test = ignore_test) #estimate gene slopes
     else:
