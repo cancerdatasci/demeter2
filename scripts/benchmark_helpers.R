@@ -198,6 +198,66 @@ get_pred_auc <- function(pred, res) {
 #                 SSMD_non_ess = SSMD_non_ess, SSMD_unexp = SSMD_unexp))
 # }
 
+
+get_dep_feat_cor_ <- function(dep_dset, targ_gene, feature, use_bayes) {
+  u_cls <- intersect(rownames(dep_data[[dep_dset]]$gene_scores), names(feature))
+  if (dep_data[[dep_dset]]$mod_type == 'D2' & use_bayes) {
+    wtd.cors(dep_data[[dep_dset]]$gene_scores[u_cls, targ_gene],
+             feature[u_cls], weight = 1/dep_data[[dep_dset]]$gene_score_SDs[u_cls, targ_gene]^2)[,1]
+  } else {
+    cor(dep_data[[dep_dset]]$gene_scores[u_cls, targ_gene], feature[u_cls],
+        use = 'pairwise.complete.obs')
+  }
+}
+
+get_dep_feat_cors_ <- function(dep_dset, targ_gene, features, feat_gene,use_bayes) {
+  u_cls <- intersect(rownames(dep_data[[dep_dset]]$gene_scores), rownames(features))
+  if (dep_data[[dep_dset]]$mod_type == 'D2' & use_bayes) {
+    feat_cors <- wtd.cors(dep_data[[dep_dset]]$gene_scores[u_cls, targ_gene],
+             features[u_cls,], weight = 1/dep_data[[dep_dset]]$gene_score_SDs[u_cls, targ_gene]^2)[1,]
+  } else {
+    feat_cors <- cor(dep_data[[dep_dset]]$gene_scores[u_cls, targ_gene], features[u_cls,],
+        use = 'pairwise.complete.obs')[1,]
+  }
+  feat_cors_z <- (feat_cors - mean(feat_cors, na.rm=T))/sd(feat_cors, na.rm=T)
+  return(feat_cors_z[feat_gene])
+}
+get_best_assoc <- function(dep_dset, targ_gene, feat_gene, z_score = FALSE) {
+  if (!(targ_gene %in% colnames(dep_data[[dep_dset]]$gene_scores))) {
+    return(NA)
+  }
+  if (feat_gene %in% colnames(feature_data$GE)) {
+    if (z_score) {
+      GE_cor <- get_dep_feat_cors_(dep_dset, targ_gene,
+                                  feature_data$GE,
+                                  feat_gene,
+                                  use_bayes = use_bayes)
+    } else {
+      GE_cor <- get_dep_feat_cor_(dep_dset, targ_gene,
+                                  feature_data$GE[, feat_gene],
+                                  use_bayes = use_bayes)
+    }
+   } else {
+    GE_cor <- NA
+  }
+  if (feat_gene %in% colnames(feature_data$CN)) {
+    if (z_score) {
+      CN_cor <- get_dep_feat_cors_(dep_dset, targ_gene,
+                                  feature_data$CN,
+                                  feat_gene,
+                                  use_bayes = use_bayes)
+    } else {
+      CN_cor <- get_dep_feat_cor_(dep_dset, targ_gene,
+                                  feature_data$CN[, feat_gene],
+                                  use_bayes = use_bayes)
+    }
+  } else {
+    CN_cor <- NA
+  }
+  return(pmax(abs(GE_cor), abs(CN_cor), na.rm=T))
+}
+
+
 renorm_gene_scores <- function(mod) {
     guide_eff <- mod$guide_Geff %>% set_names(mod$data_names$hps)
     gene_max_Geff <- rep(NA, length(mod$mapGH))
@@ -316,7 +376,7 @@ plot_colorByDensity = function(df, var1, var2, size = 1) {
     df$dens <- col2rgb(x)[1,] + 1L
     ggplot(df, aes_string(var1, var2, 'color' = 'dens')) +
         geom_point(size = size) +
-        guides(color = FALSE) +
+        guides(color = guide_colorbar(title = 'Density', ticks = FALSE, label = FALSE)) +
         scale_color_distiller(palette = "Spectral")
 }
 
@@ -572,7 +632,7 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
                 colnames(cur_dep_info$gene_scores) <- str_match(colnames(cur_dep_info$gene_scores), '\\((.+)\\)')[,2]
             }
         }
-        if (cur_dep_info$mod_type == 'GA' | cur_dep_info$mod_type == 'RSA') {
+        if (cur_dep_info$mod_type == 'GA' | cur_dep_info$mod_type == 'RSA' | cur_dep_info$mod_type == 'mageck') {
             #load this from taiga
             cur_dep_info$gene_scores <- load.from.taiga(
                 data.name=cur_dep_info$taiga_name,
@@ -1044,17 +1104,17 @@ get_per_CL_stats <- function(dep_data, target_dsets, only_overlapping_genes, neg
         rownames(cur_GE) <- cur_CLs; colnames(cur_GE) <- cur_genes
         cur_per_CL_stats <- ldply(cur_CLs, function(cur_CL) {
             has_GE <- cur_CL %in% rownames(GE_mat)
+            pos_med <- median(cur_gene_scores[cur_CL, cur_gene_types == 'essential'], na.rm=T)
+            pos_mean <- mean(cur_gene_scores[cur_CL, cur_gene_types == 'essential'], na.rm=T)
             if (neg_control_type == 'unexpressed') {
                 if (!has_GE) {
-                    return(data.frame(pr = NA, roc = NA, ssmd = NA, CCLE_ID = cur_CL))
+                    return(data.frame(pr = NA, roc = NA, ssmd = NA, rob_ssmd = NA, pos_med = pos_med, pos_mean = pos_mean, CCLE_ID = cur_CL))
                 }
                 cur_calls <- get_gene_calls_UE(cur_gene_types, cur_GE[cur_CL,], GE_thresh)
             } else if (neg_control_type == 'non_essential') {
                 cur_calls <- get_gene_calls_NE(cur_gene_types)
             }
             used <- which(!is.na(cur_calls) & !is.na(cur_gene_scores[cur_CL,]))
-            pos_med <- median(cur_gene_scores[cur_CL, cur_gene_types == 'essential'], na.rm=T)
-            pos_mean <- mean(cur_gene_scores[cur_CL, cur_gene_types == 'essential'], na.rm=T)
             if (dep_data[[cur_dset]]$mod_type == 'D2' & use_bayes) {
                 pr <- pr.curve(-cur_gene_scores[cur_CL,used[cur_calls[used]]],
                                -cur_gene_scores[cur_CL,used[!cur_calls[used]]],
@@ -1170,6 +1230,9 @@ mod_type_pal <- c(
     RSA = '#662506',
     ATARiS = "#7fc97f",
     D1 = "#ef3b2c",
-    CERES = "gray"
+    CERES = "gray",
+    Mageck = 'darkmagenta',
+    `D1-PC` = 'lightgreen',
+    `GA-indnorm` = 'magenta'
 )
 

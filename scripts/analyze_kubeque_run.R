@@ -19,17 +19,19 @@ library(PRROC)
 library(GGally)
 library(limma)
 library(RColorBrewer)
+library(latex2exp)
 
 source('~/CPDS/demeter2/scripts/benchmark_helpers.R')
 
-results_dir <- '~/CPDS/demeter2/kube_results/Ach_rel_scan/'
+results_dir <- '~/CPDS/demeter2/kube_results/Ach_rel_scan'
+fig_dir <- '~/CPDS/demeter2/results/rev_figures'
 # results_dir <- '/Volumes/xchip_cga_home/jmmcfarl/demeter2_models/Ach_rel_scan/'
 
 CERES = load.from.taiga(
   data.name = 'avana-public-tentative-18q1-92d9',
   data.version = 5,
   data.file = 'gene_effect')
-colnames(CERES) <- str_match(colnames(CERES), '(.+) \\(')[,2]
+colnames(CERES) <- str_match(colnames(CERES), '\\((.+)\\)')[,2]
 
 feature_datasets <- list(
   GE = list(taiga_name = 'ccle-rnaseq-logrpkm-protein-coding-2700',
@@ -118,7 +120,6 @@ for (cur_dir in run_dirs) {
     wtd.cors(cur_d2_mod$gene_scores[common_CLs, cur_gene], 
              CERES[common_CLs, cur_gene], 
              weight = 1/CL_avg_vars[common_CLs])
-    
   })
   avg_CRISPR_cor <- mean(CRISPR_poscon_cors, na.rm=T)
   
@@ -196,20 +197,58 @@ for (cur_dir in run_dirs) {
 write_rds(all_res_df, '~/CPDS/demeter2/results/new_kube_res.rds')
 
 
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = SSMD)) + geom_raster()
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = rob_SSMD)) + geom_raster()
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = CRISPR_cor)) + geom_raster()
+# ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = SSMD)) + 
+#   geom_raster()
+# ggsave(file.path(fig_dir, 'rel_lambdas_vs_SSMD.png'), width = 6, height = 6)
 
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = within_gene_vf)) + geom_raster()
+# ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = rob_SSMD)) + geom_raster()
+# ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = CRISPR_cor)) + 
+#   geom_raster()
+
+ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = within_gene_vf)) + 
+  geom_raster() +
+  xlab(TeX('$log10(\\lambda_b)$')) +
+  ylab(TeX('$log10(\\lambda_g)$')) +
+  guides(fill = guide_colorbar(title = 'Within-gene\nvariance fraction')) +
+  theme_Publication() +
+  theme(legend.key.width = unit(0.25, 'inches'), legend.text = element_text(size = 10))
+ggsave(file.path(fig_dir, 'rel_lambdas_vs_var_fraction.png'), width = 3.5, height = 3.5)
 
 # ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = KRAS_MUT_mdiff)) + geom_raster()
 # ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = BRAF_MUT_mdiff)) + geom_raster()
 # ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = SOX10_skin_mdiff)) + geom_raster()
 
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_CN_cor)) + geom_raster()
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_CRISPR_cor)) + geom_raster()
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_AGO2_cor)) + geom_raster()
+# ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_CN_cor)) + 
+#   geom_raster()
 
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = R2_test)) + geom_raster()
+ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_CRISPR_cor)) +
+  geom_raster() +
+  xlab(TeX('$log10(\\lambda_b)$')) +
+  ylab(TeX('$log10(\\lambda_g)$')) +
+  scale_fill_gradient(limits = c(0.215, 0.24), breaks = c(0.22, 0.24)) +
+  guides(fill = guide_colorbar(title = 'Corr. with CRISPR')) +
+  theme_Publication() +
+  theme(legend.key.width = unit(0.25, 'inches'), legend.text = element_text(size = 10))
+ggsave(file.path(fig_dir, 'rel_lambdas_vs_CRISPR_cor.png'), width = 3.5, height = 3.5)
 
-ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = R2_train)) + geom_raster()
+# ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = avg_AGO2_cor)) + 
+#   geom_raster()
+
+ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = R2_test)) + 
+  geom_raster() +
+  xlab(TeX('$log10(\\lambda_b)$')) +
+  ylab(TeX('$log10(\\lambda_g)$')) +
+  guides(fill = guide_colorbar(title = TeX('Test $R^2$'))) +
+  scale_fill_gradient(breaks = c(0.74, 0.78)) +
+  theme_Publication() +
+  theme(legend.key.width = unit(0.25, 'inches'), legend.text = element_text(size = 10))
+ggsave(file.path(fig_dir, 'rel_lambdas_vs_R2test.png'), width = 3.5, height = 3.5)
+
+ggplot(all_res_df, aes(log10(rel_seed_l2_lambda), log10(rel_gene_l2_lambda), fill = R2_train)) + 
+  geom_raster() +
+  xlab(TeX('$log10(\\lambda_b)$')) +
+  ylab(TeX('$log10(\\lambda_g)$')) +
+  guides(fill = guide_colorbar(title = TeX('Train $R^2$'))) +
+  theme_Publication() +
+  theme(legend.key.width = unit(0.25, 'inches'), legend.text = element_text(size = 10))
+ggsave(file.path(fig_dir, 'rel_lambdas_vs_R2train.png'), width = 3.5, height = 3.5)

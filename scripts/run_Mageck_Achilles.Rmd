@@ -1,0 +1,298 @@
+---
+title: "Mageck_test"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(plyr); library(magrittr); 
+library(reshape2)
+library(tibble)
+library(dplyr)
+library(taigr);
+library(ggplot2)
+library(ggrepel)
+library(dependr)
+library(readr)
+library(stringr)
+library(cowplot)
+library(weights)
+library(psych)
+library(knitr)
+library(cdsr)
+library(edgeR)
+library(limma)
+library(jmmBase)
+
+sh_targets <- load.from.taiga(data.name='gpp-shrna-mapping-8759', data.version=6, data.file = 'shmap_19mer_noXLOC_Entrezonly')
+
+source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
+load('~/CPDS/data/CCLE/CleanCellLineName.RData')
+data_dir <- '~/CPDS/data/Achilles/shRNA/'
+```
+
+```{r}
+proc_names <- function(names) {
+    names <- tolower(names)
+    names <- str_replace_all(names, '  ', ' ')
+    return(make.names(names))
+}
+remove_from_list <- function(data, remove_list) {
+    #get rid of replicate samples in the remove list
+    to_remove <- colnames(data) %in% remove_list
+    print(sprintf('removing %d samples', sum(to_remove)))
+    return(data[, !to_remove])
+}
+get_CL_names <- function(data) {
+    sample_CL <- str_match(colnames(data), '(.+)\\.(rep)')[,2]
+    bad_cols <- grepl('^[Xx][1-9]',sample_CL)
+    sample_CL[bad_cols] <- str_sub(sample_CL[bad_cols],2)
+    sample_CL %<>% str_replace('dv.90_2nd', 'dv.90')
+    sample_CL %<>% str_replace('dv.90', 'ls180') #name change for dv90
+    sample_CL[sample_CL == 'mutz.2'] <- 'OCIAML5_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE' #name change for MUTZ2
+    cleaned_CL_names <- CleanCellLineName(sample_CL)
+    # cleaned_CL_names <- cleaned_CL_names[!is.na(cleaned_CL_names)]
+    return(cleaned_CL_names)
+}
+
+
+build_mageck_inputs <- function(data_path, sh_targets, remove_list) {
+  if (str_detect(data_path, '.gct')) {
+     counts_data <- read.gct(data_path)
+  } else {
+    counts_data <- jmmBase::load_matrix_fast(data_path)
+  }
+  colnames(counts_data) <- proc_names(colnames(counts_data))
+  counts_data %<>% remove_from_list(remove_list)
+
+  #separate sample and pDNA
+  pDNA_samples <- counts_data[, grepl('pdna', colnames(counts_data), ignore.case = T), drop = FALSE]
+  counts_data <- counts_data[, !grepl('pdna', colnames(counts_data), ignore.case = T), drop = FALSE]
+  
+  #subset used shs
+  sh_targets <- sh_targets %>% 
+    filter(`Barcode Sequence` %in% rownames(counts_data))
+  
+  #throw out promiscuous hairpins
+  promiscuous_hps <- sh_targets %>% 
+    group_by(`Barcode Sequence`) %>% 
+    summarise(n_gene_targets = n()) %>% 
+    filter(n_gene_targets > 10) %>% 
+    .[['Barcode Sequence']]
+  counts_data <- counts_data[!(rownames(counts_data) %in% promiscuous_hps),]
+  pDNA_samples <- pDNA_samples[!(rownames(pDNA_samples) %in% promiscuous_hps),]
+  
+  cur_CL_names <- get_CL_names(counts_data)
+  unique_CLs <- unique(cur_CL_names[!is.na(cur_CL_names)])
+  
+  #build design mat
+  cur_sample_counts <- counts_data
+  design_mat <- model.matrix(~0 + cur_CL_names) 
+  colnames(design_mat) %<>% str_replace_all(., 'cur_CL_names', '')
+  design_mat %<>% as.data.frame()
+  design_mat$Samples <- colnames(counts_data)
+  design_mat$baseline <- 1
+  design_mat %<>% rbind.fill(data.frame(Samples = colnames(pDNA_samples), baseline = 1))
+  design_mat[is.na(design_mat)] <- 0
+  design_mat <- cbind(design_mat[, c('Samples', 'baseline')], design_mat[, setdiff(colnames(design_mat), c('Samples', 'baseline'))])
+  
+  #assemble counts mat
+  cur_all_counts <- cbind(pDNA_samples, cur_sample_counts) 
+  used_shs <- sh_targets %>% 
+    filter(!grepl('NO_CURRENT', `Gene ID`)) %>% 
+    dplyr::select(sgRNA = `Barcode Sequence`, gene = `Gene ID`) %>% 
+    filter(sgRNA %in% rownames(cur_all_counts))
+  cur_all_counts <- cur_all_counts[used_shs$sgRNA, ]
+  cur_all_counts %<>% as.data.frame() %>% 
+    rownames_to_column(var = 'sgRNA') %>% 
+    mutate(gene = used_shs$gene)
+  cur_all_counts <- cbind(cur_all_counts[, c('sgRNA', 'gene')], cur_all_counts[, setdiff(colnames(cur_all_counts), c('sgRNA', 'gene'))])
+  return(list(counts_data = cur_all_counts, design_mat = design_mat))
+}
+temp_dir <- '~/CPDS/mageck_temp_data'
+```
+
+
+
+<!-- ```{r} -->
+<!-- temp_dir <- '~/CPDS/mageck_temp_data' -->
+<!-- #write out datasets -->
+<!-- if (!file.exists(temp_dir)) { -->
+<!--   R.utils::mkdirs(temp_dir) -->
+<!-- } -->
+
+<!-- expt_name <- 'cBOTv7' -->
+<!-- remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1) -->
+
+<!-- data_path <- file.path(data_dir, 'cBOTv7_sbsv2_allreplicates_sums.gct') -->
+<!-- mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k) -->
+<!-- counts_path <- file.path(temp_dir, paste0(expt_name, '_counts_mat.txt')) -->
+<!-- design_path <- file.path(temp_dir, paste0(expt_name, '_design_mat.txt')) -->
+<!-- write_tsv(mageck_data$counts_data, counts_path) -->
+<!-- write_tsv(mageck_data$design_mat, design_path) -->
+
+<!-- # mageck mle -k ~/CPDS/mageck_temp_data/cBOTv7_counts_mat.txt -d ~/CPDS/mageck_temp_data/cBOTv7_design_mat.txt -n cBOTv7 --no-permutation-by-group --threads 6 --permutation-round 0  -->
+
+<!-- ``` -->
+
+```{r}
+expt_name <- 'cBOTv7'
+setwd('~/CPDS/demeter2/results/mageck/Ach_cBOTv7/')
+
+remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1)
+
+data_path <- file.path(data_dir, 'cBOTv7_sbsv2_allreplicates_sums.gct')
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k)
+
+cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
+for (cur_CL in cur_CLs) {
+  print(cur_CL)
+  cur_design_mat <- mageck_data$design_mat[, c('Samples', 'baseline', cur_CL)]
+  cur_design_mat <- cur_design_mat[rowSums(mageck_data$design_mat[, setdiff(colnames(mageck_data$design_mat), colnames(cur_design_mat))]) == 0,]
+  cur_samples <- cur_design_mat$Samples
+  cur_counts_mat <- mageck_data$counts_data[, c('sgRNA', 'gene', cur_samples)]
+  counts_path <- file.path(temp_dir, 'counts_mat_solo.txt')
+  design_path <- file.path(temp_dir, 'design_mat_solo.txt')
+  write_tsv(cur_counts_mat, counts_path)
+  write_tsv(cur_design_mat, design_path)
+  
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method total', cur_CL) 
+  system(cmd)
+}
+```
+
+
+<!-- ```{r} -->
+<!-- expt_name <- 'cBOTv8' -->
+<!-- remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1) -->
+
+<!-- data_path <- file.path(data_dir, 'cBOTv8_sbsv3_allreplicates_sums.gct') -->
+<!-- mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k) -->
+<!-- counts_path <- file.path(temp_dir, paste0(expt_name, '_counts_mat.txt')) -->
+<!-- design_path <- file.path(temp_dir, paste0(expt_name, '_design_mat.txt')) -->
+<!-- write_tsv(mageck_data$counts_data, counts_path) -->
+<!-- write_tsv(mageck_data$design_mat, design_path) -->
+
+<!-- # mageck mle -k ~/CPDS/mageck_temp_data/cBOTv8_counts_mat.txt -d ~/CPDS/mageck_temp_data/cBOTv8_design_mat.txt -n cBOTv8 --no-permutation-by-group --threads 6 --permutation-round 0 -->
+<!-- ``` -->
+
+
+```{r}
+expt_name <- 'cBOTv8'
+remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1)
+setwd('~/CPDS/demeter2/results/mageck/Ach_cBOTv8/')
+
+data_path <- file.path(data_dir, 'cBOTv8_sbsv3_allreplicates_sums.gct')
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k)
+
+cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
+for (cur_CL in cur_CLs) {
+  print(cur_CL)
+  cur_design_mat <- mageck_data$design_mat[, c('Samples', 'baseline', cur_CL)]
+  cur_design_mat <- cur_design_mat[rowSums(mageck_data$design_mat[, setdiff(colnames(mageck_data$design_mat), colnames(cur_design_mat))]) == 0,]
+  cur_samples <- cur_design_mat$Samples
+  cur_counts_mat <- mageck_data$counts_data[, c('sgRNA', 'gene', cur_samples)]
+  counts_path <- file.path(temp_dir, 'counts_mat_solo.txt')
+  design_path <- file.path(temp_dir, 'design_mat_solo.txt')
+  write_tsv(cur_counts_mat, counts_path)
+  write_tsv(cur_design_mat, design_path)
+  
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method total', cur_CL) 
+  system(cmd)
+}
+```
+
+
+<!-- ```{r} -->
+<!-- expt_name <- '98k' -->
+<!-- remove_list_98k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_98k.txt'), col_names = FALSE)$X1) -->
+
+<!-- data_path <- file.path(data_dir, 'Achilles98k_20150515_AllReplicates_20150515_rawReadCounts.csv') -->
+<!-- mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_98k) -->
+<!-- counts_path <- file.path(temp_dir, paste0(expt_name, '_counts_mat.txt')) -->
+<!-- design_path <- file.path(temp_dir, paste0(expt_name, '_design_mat.txt')) -->
+<!-- write_tsv(mageck_data$counts_data, counts_path) -->
+<!-- write_tsv(mageck_data$design_mat, design_path) -->
+
+<!-- # mageck mle -k ~/CPDS/mageck_temp_data/98k_counts_mat.txt -d ~/CPDS/mageck_temp_data/98k_design_mat.txt -n 98k --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method none -->
+<!-- ``` -->
+
+
+```{r}
+expt_name <- '98k'
+remove_list_98k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_98k.txt'), col_names = FALSE)$X1)
+setwd('~/CPDS/demeter2/results/mageck/Ach_98k/')
+
+data_path <- file.path(data_dir, 'Achilles98k_20150515_AllReplicates_20150515_rawReadCounts.csv')
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_98k)
+
+cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
+for (cur_CL in cur_CLs) {
+  print(cur_CL)
+  cur_design_mat <- mageck_data$design_mat[, c('Samples', 'baseline', cur_CL)]
+  cur_design_mat <- cur_design_mat[rowSums(mageck_data$design_mat[, setdiff(colnames(mageck_data$design_mat), colnames(cur_design_mat))]) == 0,]
+  cur_samples <- cur_design_mat$Samples
+  cur_counts_mat <- mageck_data$counts_data[, c('sgRNA', 'gene', cur_samples)]
+  counts_path <- file.path(temp_dir, 'counts_mat_solo.txt')
+  design_path <- file.path(temp_dir, 'design_mat_solo.txt')
+  write_tsv(cur_counts_mat, counts_path)
+  write_tsv(cur_design_mat, design_path)
+  
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 2 --permutation-round 0 --norm-method total', cur_CL) 
+  system(cmd)
+}
+```
+
+
+```{r}
+load_mageck_results <- function(file_list) {
+  llply(file_list, function(cur_file) {
+  df <- suppressMessages(read_tsv(cur_file))
+  targ_col <- grep('\\|beta', colnames(df), value = T)
+  df <- df[, c('Gene', 'sgRNA', targ_col)]
+  colnames(df) <- str_replace(colnames(df), '\\|beta', '')
+  df %<>% as.data.frame()
+  return(df)
+}) %>% plyr::join_all(by = c('Gene', 'sgRNA'), type = 'full')
+}
+
+cur_dir <- '~/CPDS/demeter2/results/mageck/Ach_cBOTv7/'
+cur_files <- list.files(cur_dir, pattern = 'gene_summary.txt', full.names = TRUE)
+res_cBOTv7 <- load_mageck_results(cur_files)
+
+cur_dir <- '~/CPDS/demeter2/results/mageck/Ach_cBOTv8/'
+cur_files <- list.files(cur_dir, pattern = 'gene_summary.txt', full.names = TRUE)
+res_cBOTv8 <- load_mageck_results(cur_files)
+
+cur_dir <- '~/CPDS/demeter2/results/mageck/Ach_98k/'
+cur_files <- list.files(cur_dir, pattern = 'gene_summary.txt', full.names = TRUE)
+res_98k <- load_mageck_results(cur_files)
+
+min_sgRNA <- 2
+all_mageck <- llply(list(res_cBOTv7, res_cBOTv8, res_98k), function(df) {
+  df %>% 
+    dplyr::filter(sgRNA >= min_sgRNA) %>% 
+    dplyr::select(-sgRNA)
+}) %>% join_all(by = 'Gene', type = 'full') %>% 
+  column_to_rownames(var = 'Gene')
+
+#z-score normalize per CL
+# all_mageck %<>% scale(center = T, scale = T)
+
+gene_symbols <- cdsr::map_genes(genes = rownames(all_mageck), input_format = 'entrez', output_format = 'hgnc')$mapping$hgnc
+new_names <- paste0(gene_symbols, ' (', rownames(all_mageck), ')')
+rownames(all_mageck) <- new_names
+write.csv(all_mageck, '~/CPDS/demeter2/results/mageck/Achilles_mageck_gene_scores.csv', row.names = TRUE)
+```
+
+
+
+<!-- ```{r} -->
+<!-- results <- read_tsv('~/Desktop/test.gene_summary.txt') -->
+<!-- results <- results[, c('Gene', 'sgRNA', paste0(cur_CL_names, '|beta'))] -->
+<!-- colnames(results) %<>% str_replace_all(., '\\|beta', '') -->
+<!-- ``` -->
+
+

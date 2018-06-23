@@ -10,6 +10,8 @@ library(cowplot)
 library(dependr)
 library(readr)
 library(stringr)
+library(latex2exp)
+source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
 fig_dir <- '~/CPDS/demeter2/results/rev_figures'
 
@@ -55,47 +57,34 @@ g1 <- R2_res %>%
   ggplot(aes(gene_l2_lambda, train_SSMD, group = gene_l2_lambda)) + 
   geom_boxplot() +
   scale_x_log10() +
-  xlab('Avg gene-effect lambda') +
-  ylab('Pos-neg control\nseparation (SSMD)')
+  xlab(TeX('Avg. gene-effect reg. ($\\lambda_{\\bar{g}}$)')) +
+  ylab('Pos-neg control\nseparation (SSMD)') +
+  theme_Publication()
+
 g2 <- R2_res %>% 
   ggplot(aes(seed_l2_lambda, train_SSMD, group = seed_l2_lambda)) + 
   geom_boxplot() +
   scale_x_log10() +
-  xlab('Avg seed-effect lambda') +
-  ylab('Pos-neg control\nseparation (SSMD)')
+  xlab(TeX('Avg. seed-effect reg. ($\\lambda_{\\bar{b}}$)')) +
+  ylab('Pos-neg control\nseparation (SSMD)') +
+  theme_Publication()
+
 g3 <- R2_res %>% 
   ggplot(aes(hairpin_l2_lambda, train_SSMD, group = hairpin_l2_lambda)) + 
   geom_boxplot() +
   scale_x_log10() +
-  xlab('shRNA pDNA-offset lambda') +
-  ylab('Pos-neg control\nseparation (SSMD)')
+  xlab(TeX('shRNA pDNA-offset reg. ($\\lambda_{\\theta}$)')) +
+  ylab('Pos-neg control\nseparation (SSMD)') +
+  theme_Publication()
+
 g4 <- R2_res %>% 
   ggplot(aes(hp_unpred_l2_lambda, train_SSMD, group = hp_unpred_l2_lambda)) + 
   geom_boxplot() +
   scale_x_log10() +
-  xlab('shRNA overall offset lambda') +
-  ylab('Pos-neg control\nseparation (SSMD)')
+  xlab(TeX('shRNA off-target offset reg. ($\\lambda_{c}$)')) +
+  ylab('Pos-neg control\nseparation (SSMD)') +
+  theme_Publication()
 
-# g1 <- R2_res %>% group_by(gene_l2_lambda) %>% 
-#     summarise(avg_SSMD = mean(train_SSMD)) %>% 
-#     ggplot(aes(gene_l2_lambda, avg_SSMD)) + 
-#     geom_line() + geom_point() +
-#     scale_x_log10()
-# g2 <- R2_res %>% group_by(seed_l2_lambda) %>% 
-#     summarise(avg_SSMD = mean(train_SSMD)) %>% 
-#     ggplot(aes(seed_l2_lambda, avg_SSMD)) + 
-#     geom_line() + geom_point() +
-#     scale_x_log10()
-# g3 <- R2_res %>% group_by(hairpin_l2_lambda) %>% 
-#     summarise(avg_SSMD = mean(train_SSMD)) %>% 
-#     ggplot(aes(hairpin_l2_lambda, avg_SSMD)) + 
-#     geom_line() + geom_point() +
-#     scale_x_log10()
-# g4 <- R2_res %>% group_by(hp_unpred_l2_lambda) %>% 
-#     summarise(avg_SSMD = mean(train_SSMD)) %>% 
-#     ggplot(aes(hp_unpred_l2_lambda, avg_SSMD)) + 
-#     geom_line() + geom_point() +
-#     scale_x_log10()
 plot_grid(g1, g2, g3, g4, ncol =2)
 
 ggsave(file.path(fig_dir, 'abs_hyperparam_boxplot.png'), width = 7, height = 7, dpi = 350)

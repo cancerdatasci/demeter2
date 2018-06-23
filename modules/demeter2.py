@@ -448,7 +448,8 @@ class demeter:
         gene_scores = gene_score + gene_score_avgs
         noise_vars_per_CL = pd.DataFrame({'noise_vars': CL_noise_vars.flatten(), 'CL_name': self.all_CL_names}) \
             .groupby('CL_name').mean().ix[self.data_names['CLs'],:].values
-        weights = noise_vars_per_CL.reshape(-1,1) / np.nanmean(noise_vars_per_CL)
+        weights = 1 / noise_vars_per_CL.reshape(-1,1) 
+        weights = weights / np.nanmean(weights)
         weight_avg = np.nanmean(gene_scores * weights, axis = 0)
         if use_test: #if using cross-val on set of control genes
             pop1 = weight_avg[np.in1d(self.data_names['genes'], self.gene_sets['neg_test'])]

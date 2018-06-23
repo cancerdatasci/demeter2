@@ -31,3 +31,22 @@ sparkles sub --clean --loglive -n comb_final -u /Users/jmmcfarl/CPDS/demeter2/da
 sparkles sub -n Ach_gene_xval --params ./seed_params.csv -u /Users/jmmcfarl/CPDS/demeter2/data:./data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules:./modules -u /Users/jmmcfarl/.taiga/token:taiga/token python3 ./modules/fit_demeter2.py --data_name Ach --gene_xv_frac 0.5 --max_alt_iters 4 --no_edward --save_perf_only --random_seed '{random_seed}'
 
 
+#simulation
+sparkles sub --clean -n sim_fit -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation/sim_LFC1.csv -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation/sim_LFC2.csv -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation/sim_LFC3.csv python3 ./modules/fit_demeter2.py --data_files ./data/data_files_sim_paths --edward_iters 5000
+
+
+sparkles sub --clean -n sim_fit_noeff -u /Users/jmmcfarl/CPDS/demeter2/data -u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules -u /Users/jmmcfarl/.taiga/token:taiga/token -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation_noeff/sim_LFC1.csv -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation_noeff/sim_LFC2.csv -u /Users/jmmcfarl/CPDS/data/d2_testing/simulation_noeff/sim_LFC3.csv python3 ./modules/fit_demeter2.py --data_files ./data/data_files_sim_paths_noeff --no_shRNA_effs
+
+python3 /demeter2/modules/fit_demeter2.py --data_files /test/data_files_sim_paths_noeff --no_shRNA_effs
+
+
+sparkles sub --clean -n sim_run_n_CLs \
+--params /Users/jmmcfarl/CPDS/packages/demeter2_pub/data/sparkles_sim_n_CLs.csv \
+-u /Users/jmmcfarl/CPDS/packages/demeter2_pub/modules \
+-u /Users/jmmcfarl/.taiga/token:taiga/token \
+-u /Users/jmmcfarl/CPDS/packages/demeter2_pub/scripts/run_simulation_test.py \
+-u /Users/jmmcfarl/CPDS/data/d2_testing/data_files_cur_sim_paths \
+-u /Users/jmmcfarl/CPDS/data/d2_testing/simulation/ground_truth_LFCs_0.csv \
+-u /Users/jmmcfarl/CPDS/data/d2_testing/simulation/noise_SDs_0.csv \
+python3 run_simulation_test.py --ground_truth ground_truth_LFCs_0.csv --noise_SD noise_SDs_0.csv --n_CLs {n_CLs} --n_genes 50000 --n_iters {n_iters}
+
