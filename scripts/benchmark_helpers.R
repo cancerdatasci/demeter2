@@ -1217,6 +1217,7 @@ data_type_pal <- c(
     `D2 DRIVE`= 'orange',
     `D2 comb` = 'firebrick',
     `GA comb` = 'purple',
+    `D1 comb` = 'lightblue',
     CRISPR = 'gray',
     Achilles = 'forestgreen',
     DRIVE= 'orange',

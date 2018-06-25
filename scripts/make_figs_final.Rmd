@@ -41,9 +41,8 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/rev_figures'
-# fig_dir <- '~/Desktop/D2_figures_test'
-temp_file_suffix <- 'oldreg'
+fig_dir <- '~/CPDS/demeter2/results/figures'
+temp_file_suffix <- 'final'
 base_font <- 12 #font size for figs
 
 ###PARAMETERS
@@ -110,6 +109,8 @@ dep_datasets <- list(
     Mageck_Ach = list(mod_type = 'mageck', dataset = 'Ach', type = 'abs',
                       taiga_name = 'achilles-mageck-scores-4f94',
                       taiga_version = 1),
+    Mageck_DRIVE = list(mod_type = 'mageck', dataset = 'DRIVE', type = 'abs',
+                        taiga_name = 'mageck-d400', taiga_version = 1),
     CERES_CRISPR = list(mod_type = 'CERES', dataset = 'CRISPR', type = 'abs',
                  taiga_name = 'avana-public-tentative-18q1-92d9',
                  taiga_version = 5,
@@ -166,6 +167,7 @@ export_fig <- function(fig_name, width, height, type = 'png', plot = NULL) {
     } else if (type == 'pdf') {
         ggsave(file.path(fig_dir, paste0(fig_name, '.pdf')), 
                width = width, height = height, plot = plot, device = cairo_pdf())
+      dev.off()
     }
 }
 ```
@@ -326,26 +328,6 @@ CRISPR_benchmarks %<>%
 
 ```
 
-```{r, include = FALSE}
-# MAKE manual merge of 3 datasets 
-D1_merge <- make.a.tidy.dataset(
-    list(Ach = dep_data$D1_Ach$gene_scores,
-         DRIVE = dep_data$D1_DRIVE$gene_scores,
-         Marc = dep_data$D1_Marc$gene_scores),
-    na.cols = TRUE, na.rows = TRUE, dim.names = c('CCLE_ID', 'Gene')
-)
-D1_merge$Avg <- rowMeans(D1_merge[, c('Ach', 'DRIVE', 'Marc')], na.rm=T)
-D1_merge %<>%
-    dplyr::select(CCLE_ID, Gene, Avg) %>%
-    spread(Gene, Avg)
-D1_merge %<>% remove_rownames() %>% column_to_rownames(var = 'CCLE_ID')
-dep_datasets$D1_merge <- list(
-    type = 'rel', mod_type = 'ATARiS'
-)
-dep_data$D1_merge <- list(type = 'rel', mod_type = 'D1',
-                         gene_scores = as.matrix(D1_merge))
-```
-
 
 
 ```{r, include = FALSE}
@@ -393,15 +375,34 @@ for (cur_dset in names(dep_datasets)) {
 if ('Mageck_Ach' %in% names(dep_data)) {
   dep_data$Mageck_Ach$gene_scores %<>% 
     t() %>% 
-    scale(center = F, scale = T) %>% 
+    scale(center = T, scale = T) %>% 
     t()
 }
 if ('Mageck_DRIVE' %in% names(dep_data)) {
    dep_data$Mageck_DRIVE$gene_scores %<>% 
     t() %>% 
-    scale(center = F, scale = T) %>% 
+    scale(center = T, scale = T) %>% 
     t()
 }
+
+```
+
+
+```{r, include = FALSE}
+# MAKE manual merge of 3 datasets 
+D1_merge <- make.a.tidy.dataset(
+    list(Ach = dep_data$D1_Ach$gene_scores,
+         DRIVE = dep_data$D1_DRIVE$gene_scores,
+         Marc = dep_data$D1_Marc$gene_scores),
+    na.cols = TRUE, na.rows = TRUE, dim.names = c('CCLE_ID', 'Gene')
+)
+D1_merge$Avg <- rowMeans(D1_merge[, c('Ach', 'DRIVE', 'Marc')], na.rm=T)
+D1_merge %<>%
+    dplyr::select(CCLE_ID, Gene, Avg) %>%
+    spread(Gene, Avg)
+D1_merge %<>% remove_rownames() %>% column_to_rownames(var = 'CCLE_ID')
+dep_data$D1_merge <- list(type = 'rel', mod_type = 'D1',
+                         gene_scores = as.matrix(D1_merge))
 
 ```
 
@@ -498,6 +499,7 @@ CERES_cors <- cor(cur_gene_avgs[, grepl('Ach', colnames(cur_gene_avgs)) | grepl(
 Ach_DRIVE_D2 <- cor(cur_gene_avgs$D2_Ach, cur_gene_avgs$D2_DRIVE, use = 'pairwise.complete.obs')
 Ach_DRIVE_GA <- cor(cur_gene_avgs$GA_Ach, cur_gene_avgs$GA_DRIVE, use = 'pairwise.complete.obs')
 Ach_DRIVE_RSA <- cor(cur_gene_avgs$RSA_Ach, cur_gene_avgs$RSA_DRIVE, use = 'pairwise.complete.obs')
+Ach_DRIVE_Mageck <- cor(cur_gene_avgs$Mageck_Ach, cur_gene_avgs$Mageck_DRIVE, use = 'pairwise.complete.obs')
 
 df <- data.frame(CERES_cors) %>% 
     rownames_to_column(var = 'dset') %>% 
@@ -506,7 +508,8 @@ df <- data.frame(CERES_cors) %>%
     mutate(dset = paste0(dset, '_CRISPR')) %>% 
     rbind(data.frame(dset = 'D2_Ach_DRIVE', cor = Ach_DRIVE_D2)) %>% 
     rbind(data.frame(dset = 'GA_Ach_DRIVE', cor = Ach_DRIVE_GA)) %>% 
-    rbind(data.frame(dset = 'RSA_Ach_DRIVE', cor = Ach_DRIVE_RSA))
+    rbind(data.frame(dset = 'RSA_Ach_DRIVE', cor = Ach_DRIVE_RSA)) %>% 
+  rbind(data.frame(dset = 'Mageck_Ach_DRIVE', cor = Ach_DRIVE_Mageck))
 
 df %<>% mutate(model = str_match(dset, '^([:alnum:]+)_')[,2],
         relat = str_match(dset, '^[:alnum:]+_(.+)')[,2], 
@@ -668,7 +671,7 @@ p1 <- ggplot(per_CL_stats %>%
     guides(fill = guide_legend(title = element_blank()))
 
 p2 <- ggplot(per_CL_stats %>% 
-           filter(dset %in% c('D2_DRIVE', 'GA_DRIVE', 'RSA_DRIVE')) %>% 
+           filter(dset %in% c('D2_DRIVE', 'GA_DRIVE', 'RSA_DRIVE', 'Mageck_DRIVE')) %>% 
            mutate(model = str_match(dset, '(.+)_')[,2]),
        aes(ssmd, fill = model)) + 
     geom_density(alpha = 0.6) + 
@@ -810,6 +813,9 @@ ggsave(file.path(fig_dir, 'AGO2_vs_SSMD.png'), width = 3.6, height = 3.25, dpi =
 
 print('AGO2-SSMD cor Achilles')
 print(with(df, cor.test(AGO2_GE, Ach_GA_ssmd, method = 'spearman')))
+#if we exclude the two outliers CLs
+print(with(df %>% filter(AGO2_GE > 0), cor.test(AGO2_GE, Ach_GA_ssmd, method = 'spearman')))
+
 
 print('AGO2-SSMD cor DRIVE')
 print(with(df, cor.test(AGO2_GE, DRIVE_GA_ssmd, method = 'spearman')))
@@ -1104,7 +1110,7 @@ high_var_genes <- gene_SDs %>%
     .[['Gene']] %>% 
     as.vector()
 
-target_dsets <- c('D1_DRIVE', 'D2_DRIVE', 'GA_DRIVE', 'D1_Ach', 'D2_Ach', 'GA_Ach', 'Mageck_Ach')
+target_dsets <- c('D1_DRIVE', 'D2_DRIVE', 'GA_DRIVE', 'D1_Ach', 'D2_Ach', 'GA_Ach')
 
 dep_cor_res <- ldply(target_dsets, function(cur_dset) {
     print(cur_dset) 
@@ -1287,7 +1293,7 @@ p1 <- ggplot(CRISPR_cors %>% filter(grepl('Ach', dset)) %>%
 
 p2 <- ggplot(CRISPR_cors %>% filter(grepl('DRIVE', dset)) %>% 
               mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
-                     model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+                     model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA', 'Mageck'))), 
        aes(avg_essentiality_DRIVE, cor, color = model)) + 
     geom_smooth(lwd = 0.5) +
     ylab('Avg. CRISPR-RNAi\ndependency corr.') +
@@ -1352,7 +1358,7 @@ p1 <- ggplot(GE_cors %>% filter(grepl('Ach', dset)) %>%
 
 p2 <- ggplot(GE_cors %>% filter(grepl('DRIVE', dset)) %>% 
          mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
-                model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+                model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA', 'Mageck'))), 
        aes(avg_essentiality_DRIVE, abs(cor), color = model)) + 
     geom_smooth(lwd = 0.5) +
     ylab('Avg. dep-GE\ncorrelation magnitude') +
@@ -1419,7 +1425,7 @@ p1 <- ggplot(CN_cors %>% filter(grepl('Ach', dset)) %>%
 
 p2 <- ggplot(CN_cors %>% filter(grepl('DRIVE', dset)) %>% 
         mutate(model = str_match(dset, '([:alnum:]+)_')[,2],
-               model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+               model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA', 'Mageck'))), 
        aes(avg_essentiality_DRIVE, abs(cor), color = model)) + 
     geom_smooth(lwd = 0.5) +
     ylab('Avg. dep-CN\ncorrelation magnitude') +
@@ -1636,7 +1642,7 @@ p1 <- ggplot(df %>% filter(grepl('Ach', variable)) %>%
 
 p2 <- ggplot(df %>% filter(grepl('DRIVE', variable)) %>% 
            mutate(model = str_match(variable, '([:alnum:]+)_')[,2],
-                  model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA'))), 
+                  model = factor(model, levels = c('D2', 'D1', 'ATARiS', 'GA', 'RSA', 'Mageck'))), 
        aes(abs(value), color = model)) + 
     stat_ecdf(size = 0.6) +
     scale_x_reverse() +
@@ -1910,6 +1916,8 @@ grid.draw(venn.plot)
 
 ```
 
+### Lineage pie chart
+
 ```{r}
 CL_meta_data <- read.csv('~/CPDS/data/D2_figshare/sample_info.csv', stringsAsFactors = F, check.names = F)
 
@@ -1999,7 +2007,7 @@ library(pcaMethods)
 center <- TRUE
 D2_pcs <- pcaMethods::pca(dep_data$D2_comb$gene_scores,
                           method = 'ppca',
-                          nPCs = 2,
+                          nPcs = 2,
                           scale = 'none',
                           center = center)
 D2_R2sum <- R2cum(D2_pcs)
@@ -2007,28 +2015,37 @@ D2_pcs <- scores(D2_pcs)
 
 GA_pcs <- pcaMethods::pca(dep_data$GA_comb$gene_scores,
                           method = 'ppca',
-                          nPCs = 2,
+                          nPcs = 2,
                           scale = 'none',
                           center = center)
 GA_R2sum <- R2cum(GA_pcs)
 GA_pcs <- scores(GA_pcs)
 
-dep_data$D1_merge$gene_scores[is.na(dep_data$D1_merge$gene_scores)] <- NA
-D1_pcs <- pcaMethods::pca(dep_data$D1_merge$gene_scores,
-                          method = 'ppca',
-                          nPCs = 2,
-                          scale = 'none',
-                          center = center)
-D1_R2sum <- R2cum(D1_pcs)
-D1_pcs <- scores(D1_pcs)
+# dep_data$D1_merge$gene_scores[is.na(dep_data$D1_merge$gene_scores)] <- NA
+# D1_pcs <- pcaMethods::pca(dep_data$D1_merge$gene_scores,
+#                           method = 'ppca',
+#                           nPcs = 2,
+#                           scale = 'none',
+#                           center = center)
+# D1_R2sum <- R2cum(D1_pcs)
+# D1_pcs <- scores(D1_pcs)
+
+# dep_data$ATARiS_merge$gene_scores[is.na(dep_data$ATARiS_merge$gene_scores)] <- NA
+# D1_pcs <- pcaMethods::pca(dep_data$ATARiS_merge$gene_scores,
+#                           method = 'ppca',
+#                           nPcs = 2,
+#                           scale = 'none',
+#                           center = center)
+# D1_R2sum <- R2cum(D1_pcs)
+# D1_pcs <- scores(D1_pcs)
+
 
 print('D2 R2 sum')
 print(D2_R2sum)
-print('D1 R2 sum')
-print(D1_R2sum)
+# print('D1 R2 sum')
+# print(D1_R2sum)
 print('GA R2 sum')
 print(GA_R2sum)
-
 
 a_df <- data.frame(CCLE_ID = rownames(dep_data$D2_comb$gene_scores), 
                    D2_PC1 = D2_pcs[,1], 
@@ -2039,11 +2056,11 @@ a_df <- data.frame(CCLE_ID = rownames(dep_data$D2_comb$gene_scores),
                    GA_PC1 = GA_pcs[,1], 
                    GA_PC2 = GA_pcs[,2]  
     ), by = 'CCLE_ID') %>% 
-    left_join(data.frame(
-      CCLE_ID = rownames(dep_data$D1_merge$gene_scores), 
-                   D1_PC1 = D1_pcs[,1], 
-                   D1_PC2 = D1_pcs[,2]  
-    ), by = 'CCLE_ID') %>% 
+    # left_join(data.frame(
+    #   CCLE_ID = rownames(dep_data$ATARiS_merge$gene_scores),
+    #                D1_PC1 = D1_pcs[,1],
+    #                D1_PC2 = D1_pcs[,2]
+    # ), by = 'CCLE_ID') %>%
   mutate(CCLE_ID = as.character(CCLE_ID))
 # a_df %<>% left_join(CL_ann, by ='CCLE_ID')
 
@@ -2078,37 +2095,46 @@ cmap <- c(Achilles98k = 'lightblue',
           Marc_only = 'gold',
           `Ach+Marc` = 'darkgreen')
 
+D2_PC1_var <- D2_R2sum[1]*100
+D2_PC2_var <- (D2_R2sum[2]-D2_R2sum[1])*100
 p1 <- ggplot(a_df, aes(D2_PC1, D2_PC2, fill = CL_m)) + 
     geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
     guides(fill = guide_legend(title = 'Batch')) +
-    xlab('PC1') + ylab('PC2') +
+    xlab(sprintf('PC1 (%.1f%% variance)', D2_PC1_var)) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', D2_PC2_var)) + 
     ggtitle('D2-combined') +
     # scale_fill_Publication() +
     scale_fill_manual(values = cmap) +
     theme_Publication(base_font) 
 
+GA_PC1_var <- GA_R2sum[1]*100
+GA_PC2_var <- (GA_R2sum[2]-GA_R2sum[1])*100
 p2 <- ggplot(a_df, aes(GA_PC1, GA_PC2, fill = CL_m)) + 
     geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
     guides(fill = guide_legend(title = 'Batch')) +
-    xlab('PC1') + ylab('PC2') +
+    xlab(sprintf('PC1 (%.1f%% variance)', GA_PC1_var)) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', GA_PC2_var)) + 
     ggtitle('GA-combined') +
     # scale_fill_Publication() +
     scale_fill_manual(values = cmap) +
     theme_Publication(base_font) 
 
-p3 <- ggplot(a_df, aes(D1_PC1, D1_PC2, fill = CL_m)) + 
-    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
-    guides(fill = guide_legend(title = 'Batch')) +
-    xlab('PC1') + ylab('PC2') +
-    ggtitle('D1-combined') +
-    # scale_fill_Publication() +
-    scale_fill_manual(values = cmap) +
-    theme_Publication(base_font) 
+# D1_PC1_var <- D1_R2sum[1]*100
+# D1_PC2_var <- (D1_R2sum[2]-D1_R2sum[1])*100
+# p3 <- ggplot(a_df, aes(D1_PC1, D1_PC2, fill = CL_m)) +
+#     geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) +
+#     guides(fill = guide_legend(title = 'Batch')) +
+#     xlab(sprintf('PC1 (%.1f%% variance)', D1_PC1_var)) +
+#     ylab(sprintf('PC2 (%.1f%% variance)', D1_PC2_var)) +
+#     ggtitle('D1-combined') +
+#     # scale_fill_Publication() +
+#     scale_fill_manual(values = cmap) +
+#     theme_Publication(base_font)
 
-# mylegend<-g_legend(p1)
+mylegend<-g_legend(p1)
 
 p <- arrangeGrob(p2 + theme(legend.position="none"),
-                         p3 + theme(legend.position="none"),
+                         # p3 + theme(legend.position="none"),
                          p1 + theme(legend.position='none'),
                          nrow=1)
 # p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
@@ -2117,61 +2143,128 @@ p <- arrangeGrob(p2 + theme(legend.position="none"),
 #                          nrow=1),
 #              mylegend, nrow=2,heights=c(10, 1))
 
-ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 8.5, height = 3, dpi = 350)
-ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 8.5, height = 3, device = cairo_pdf())
+ggsave(file.path(fig_dir, 'PCA_compare.png'), plot = p, width = 6., height = 3, dpi = 350)
+ggsave(file.path(fig_dir, 'PCA_compare.pdf'), plot = p, width = 6., height = 3, device = cairo_pdf())
 
-# #QUANTIFY structure in PCs related to batch
-# a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
-#                  in_DRIVE = CCLE_ID %in% rownames(dep_data$D2_DRIVE$gene_scores),
-#                  in_Marc = CCLE_ID %in% rownames(dep_data$D2_Marc$gene_scores))
-# 
-# GA_PC1_sum <- summary(lm(GA_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# GA_PC2_sum <- summary(lm(GA_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D1_PC1_sum <- summary(lm(D1_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D1_PC2_sum <- summary(lm(D1_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D2_PC1_sum <- summary(lm(D2_PC1 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D2_PC2_sum <- summary(lm(D2_PC2 ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# lm_sum <- c(GA_PC1 = GA_PC1_sum$r.squared,
-#             GA_PC2 = GA_PC2_sum$r.squared,
-#             D1_PC1 = D1_PC1_sum$r.squared,
-#             D1_PC2 = D1_PC2_sum$r.squared,
-#             D2_PC1 = D2_PC1_sum$r.squared,
-#             D2_PC2 = D2_PC2_sum$r.squared)
-# lm_sum <- data.frame(type = names(lm_sum), r_squared = lm_sum) 
-# 
-# GA_PC1_sum <- summary(lm(abs(GA_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# GA_PC2_sum <- summary(lm(abs(GA_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D1_PC1_sum <- summary(lm(abs(D1_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D1_PC2_sum <- summary(lm(abs(D1_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D2_PC1_sum <- summary(lm(abs(D2_PC1) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# D2_PC2_sum <- summary(lm(abs(D2_PC2) ~ in_Ach + in_DRIVE + in_Marc, data = a_df))
-# lm_abs_sum <- c(GA_PC1_mag = GA_PC1_sum$r.squared,
-#             GA_PC2_mag = GA_PC2_sum$r.squared,
-#             D1_PC1_mag = D1_PC1_sum$r.squared,
-#             D1_PC2_mag = D1_PC2_sum$r.squared,
-#             D2_PC1_mag = D2_PC1_sum$r.squared,
-#             D2_PC2_mag = D2_PC2_sum$r.squared)
-# lm_abs_sum <- data.frame(type = names(lm_abs_sum), r_squared = lm_abs_sum) 
-# 
-# lm_tot <- rbind(lm_sum, lm_abs_sum) %>% 
-#     mutate(dset = str_match(type, '([:alnum:]+)_')[,2],
-#            name = str_match(type, '(.+_PC[12])')[,2],
-#            abs = grepl('mag', type),
-#            type = as.vector(type),
-#            abs = ifelse(abs, 'PC Magnitude', 'PC'))
-# ggplot(lm_tot, aes(x=name, y=r_squared, group = dset, fill = dset)) +
-#     geom_bar(stat='identity') +
-#     ylab('Batch R2') +
-#     xlab('') +
-#     facet_wrap(~abs, ncol=1) + 
-#     theme_Publication() +
-#     scale_fill_manual(values = mod_type_pal) +
-#     theme(axis.text.x=element_text(angle=90, hjust=1)) 
-# 
-# ggsave(file.path(fig_dir, 'PCA_R2.png'), width = 4, height = 5, dpi = 350)
+#QUANTIFY structure in PCs related to batch
+a_df %<>% mutate(in_Ach = CCLE_ID %in% rownames(dep_data$D2_Ach$gene_scores),
+                 in_DRIVE = CCLE_ID %in% rownames(dep_data$D2_DRIVE$gene_scores),
+                 in_Marc = CCLE_ID %in% rownames(dep_data$D2_Marc$gene_scores))
 
 ```
 
+```{r}
+merge_sets <- list(RSA = list(Ach = 'RSA_Ach', DRIVE = 'RSA_DRIVE'),
+                   ATARiS = list(Ach = 'ATARiS_Ach', DRIVE = 'ATARiS_DRIVE'),
+                   D1 = list(Ach = 'D1_Ach', DRIVE = 'D1_DRIVE'),
+                   Mageck = list(Ach = 'Mageck_Ach', DRIVE = 'Mageck_DRIVE'))
+
+all_merge_res <- llply(names(merge_sets) %>% set_names(names(merge_sets)), function(mname) {
+    # MAKE manual merge of 3 datasets
+  cur_merge <- make.a.tidy.dataset(
+      list(Ach = dep_data[[merge_sets[[mname]]$Ach]]$gene_scores,
+           DRIVE = dep_data[[merge_sets[[mname]]$DRIVE]]$gene_scores),
+      na.cols = TRUE, na.rows = TRUE, dim.names = c('CCLE_ID', 'Gene')
+  )
+  cur_merge$Avg <- rowMeans(cur_merge[, c('Ach', 'DRIVE')], na.rm=T)
+  cur_merge %<>%
+      dplyr::select(CCLE_ID, Gene, Avg) %>%
+      spread(Gene, Avg)
+  cur_merge %<>% remove_rownames() %>% column_to_rownames(var = 'CCLE_ID') %>% 
+    as.matrix()
+  
+  cur_merge[is.na(cur_merge)] <- NA
+  cur_pcs <- pcaMethods::pca(cur_merge,
+                            method = 'ppca',
+                            nPcs = 2,
+                            scale = 'none',
+                            center = center)
+  cur_R2sum <- R2cum(cur_pcs)
+  cur_pcs <- scores(cur_pcs)
+  
+  cur_df <- data.frame(
+        CCLE_ID = rownames(cur_merge), 
+                     PC1 = cur_pcs[,1], 
+                     PC2 = cur_pcs[,2]  
+      ) %>% mutate(model = mname)
+  return(list(PC_scores = cur_df, PC_vars = diff(c(0, cur_R2sum))))
+})
+get_cl_memb <- function(x) {
+    m <- rep(NA, length(x))
+    m[x %in% Ach_CLs] <- Ach_batch[x[x %in% Ach_CLs]]
+    m[x %in% DRIVE_CLs] <- 'DRIVE_only'
+    m[(x %in% Ach_CLs) & (x %in% DRIVE_CLs)] <- 'Ach+DRIVE'
+    return(m)
+}
+all_PCs <- ldply(all_merge_res, function(x) x$PC_scores) 
+all_PCs %<>% ddply(.(model), function(df) {
+    df %<>% mutate(CL_m = get_cl_memb(as.character(CCLE_ID)))
+})
+
+cmap <- c(Achilles98k = 'lightblue',
+          Achilles55k = 'darkblue',
+          `Ach+DRIVE` = 'purple',
+          DRIVE_only = 'red',
+          `DRIVE+Marc` = 'darkorange',
+          `Ach+DRIVE+Marc`='brown',
+          Marc_only = 'gold',
+          `Ach+Marc` = 'darkgreen')
+
+
+PC_vars <- all_merge_res$RSA$PC_vars*100
+ggplot(all_PCs %>% filter(model == 'RSA'), 
+       aes(PC1, PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch', nrow = 2)) +
+    xlab(sprintf('PC1 (%.1f%% variance)', PC_vars[1])) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', PC_vars[2])) + 
+    ggtitle('RSA-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+export_fig('RSA_combined_PCs', 3.5, 3.5)
+
+PC_vars <- all_merge_res$Mageck$PC_vars*100
+ggplot(all_PCs %>% filter(model == 'Mageck'), 
+       aes(PC1, PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch', nrow = 2)) +
+    xlab(sprintf('PC1 (%.1f%% variance)', PC_vars[1])) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', PC_vars[2])) + 
+    ggtitle('Mageck-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+export_fig('Mageck_combined_PCs', 3.5, 3.5)
+
+
+PC_vars <- all_merge_res$D1$PC_vars*100
+ggplot(all_PCs %>% filter(model == 'D1'), 
+       aes(PC1, PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch', nrow = 2)) +
+    xlab(sprintf('PC1 (%.1f%% variance)', PC_vars[1])) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', PC_vars[2])) + 
+    ggtitle('D1-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+export_fig('D1_combined_PCs', 3.5, 3.5)
+
+PC_vars <- all_merge_res$ATARiS$PC_vars*100
+ggplot(all_PCs %>% filter(model == 'ATARiS'), 
+       aes(PC1, PC2, fill = CL_m)) + 
+    geom_point(shape = 21, size = 2, color = 'white', alpha = 0.6) + 
+    guides(fill = guide_legend(title = 'Batch', nrow = 2)) +
+    xlab(sprintf('PC1 (%.1f%% variance)', PC_vars[1])) + 
+    ylab(sprintf('PC2 (%.1f%% variance)', PC_vars[2])) + 
+    ggtitle('ATARiS-combined') +
+    # scale_fill_Publication() +
+    scale_fill_manual(values = cmap) +
+    theme_Publication(base_font) 
+export_fig('ATARiS_combined_PCs', 3.5, 3.5)
+
+```
 
 
 ```{r, include = FALSE}
@@ -2181,7 +2274,7 @@ cur_gene_set <- Reduce(intersect, llply(dep_data[target_dsets], function(d) {col
 RNAi_common_genes <- Reduce(intersect, llply(dep_data[setdiff(target_dsets, 'CERES_CRISPR')], function(d) {colnames(d$gene_scores)}))
 RNAi_common_CLs <- Reduce(intersect, llply(dep_data[setdiff(target_dsets, 'CERES_CRISPR')], function(d) {rownames(d$gene_scores)}))
 
-gene_avgs <- ldply(target_dsets, function(cur_dset) {
+comb_gene_avgs <- ldply(target_dsets, function(cur_dset) {
     if (cur_dset == 'CERES_CRISPR') {
             cur_gene_avgs <- colMeans(dep_data[[cur_dset]]$gene_scores[, cur_gene_set], na.rm=T)
     } else {
@@ -2199,10 +2292,10 @@ gene_avgs <- ldply(target_dsets, function(cur_dset) {
                           dset = cur_dset))
 })
 
-gene_avgs %<>% mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess))
-gene_avgs_wide <- spread(gene_avgs, dset, avg_score)
+comb_gene_avgs %<>% mutate(gene_type = get_gene_type(Gene, hart_ess, hart_non_ess))
+comb_gene_avgs_wide <- spread(comb_gene_avgs, dset, avg_score)
 
-ov_gene_sep_stats <- get_gene_avg_stats(dep_data, gene_avgs, names(dep_datasets), only_overlapping_genes = FALSE, use_bayes = use_bayes)
+ov_gene_sep_stats <- get_gene_avg_stats(dep_data, comb_gene_avgs, names(dep_datasets), only_overlapping_genes = FALSE, use_bayes = use_bayes)
 
 ```
 
@@ -2215,7 +2308,7 @@ ov_gene_sep_stats %<>%
     mutate(dset = factor(dset, levels = ov_gene_sep_stats %>% arrange(desc(ssmd)) %>% .[['dset']])) %>% 
     mutate(model = str_match(as.vector(dset), '([:alnum:]+)_')[,2])
 
-CERES_cors <- cor(gene_avgs_wide[, setdiff(target_dsets, 'CERES_CRISPR')], gene_avgs_wide[, 'CERES_CRISPR', drop=F], use = 'pairwise.complete.obs')
+CERES_cors <- cor(comb_gene_avgs_wide[, setdiff(target_dsets, 'CERES_CRISPR')], comb_gene_avgs_wide[, 'CERES_CRISPR', drop=F], use = 'pairwise.complete.obs')
 df <- data.frame(CERES_cors) %>% 
     rownames_to_column(var = 'dset') %>% 
     set_colnames(c('dset', 'cor')) %>% 
@@ -2223,8 +2316,11 @@ df <- data.frame(CERES_cors) %>%
     mutate(dset = paste0(dset, '_CRISPR')) %>% 
     mutate(model = str_match(as.vector(dset), '([:alnum:]+)_')[,2])
 
-df %<>% mutate(dset = str_replace(dset, '_CRISPR', ''))
-p2 <- ggplot(df %>% mutate(dset = factor(dset, levels = df %>%
+map_names <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', D1_merge = 'D1 comb')
+df %<>% mutate(dset = str_replace(dset, '_CRISPR', ''),
+               dset = map_names[dset])
+p2 <- ggplot(df %>% 
+               mutate(dset = factor(dset, levels = df %>%
                        arrange(desc(cor)) %>% .[['dset']])), 
        aes(dset, cor, fill = model)) + 
     geom_bar(stat = 'identity') +
@@ -2248,13 +2344,13 @@ ggsave(file.path(fig_dir, 'combined_Gavg_CRISPR_cor_compare.png'), plot = p2, wi
 
 
 ```{r, include = FALSE}
-target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'CERES_CRISPR')
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'CERES_CRISPR', 'D1_merge')
 cur_CL_set <- intersect(RNAi_common_CLs, rownames(dep_data$CERES_CRISPR$gene_scores))
 cur_gene_set_with_CRISPR <- intersect(cur_gene_set, colnames(dep_data$CERES_CRISPR$gene_scores))
 target_mat <- dep_data$CERES_CRISPR$gene_scores[cur_CL_set, cur_gene_set_with_CRISPR]
 
 CRISPR_cors <- get_mat_dep_cors(setdiff(target_dsets, 'CERES_CRISPR'), target_mat, use_bayes)
-CRISPR_cors %<>% left_join(gene_avgs %>% 
+CRISPR_cors %<>% left_join(comb_gene_avgs %>% 
                                filter(dset == 'D2_comb') %>% 
                                dplyr::select(Gene, avg_essentiality = avg_score), 
                            by = "Gene")
@@ -2266,14 +2362,14 @@ CRISPR_cors %<>% left_join(gene_avgs %>%
 Similar improvements with the combined D2 dataset over D2 on either dataset alone were observed when comparing the agreement of gene dependency profiles with CRISPR.
 
 ```{r, fig.width=5, fig.height=4}
-dset_map <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', CERES_CRISPR = 'CRISPR', D2_comb2 = 'D2 comb2')
-ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D2_comb2')) %>% 
+dset_map <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', CERES_CRISPR = 'CRISPR', D1_merge = 'D1 comb')
+ggplot(CRISPR_cors %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D1_merge')) %>% 
            mutate(dset = dset_map[dset]), 
        aes(avg_essentiality, cor, color = dset)) + 
     geom_smooth(lwd = 0.5) +
     xlab('Cell line avg. dependency score') +
     ylab('Avg. RNAi-CRISPR\ndependency corr') +
-    guides(color = guide_legend(title = '', override.aes = list(lwd = 3))) +
+    guides(color = guide_legend(title = '', override.aes = list(lwd = 3), nrow = 2)) +
     coord_cartesian(xlim = c(-1.5, 0.5), ylim = c(0, 0.4)) +
     # scale_colour_Publication() +
     scale_color_manual(values = data_type_pal) +
@@ -2299,25 +2395,17 @@ ggsave(file.path(fig_dir, 'combined_CRISPR_corr_smooth.png'), width = 3.5, heigh
 ```
 
 
-```{r}
+<!-- ```{r} -->
+<!-- #test introducing SD offset -->
+<!-- SD_offset <- 0.05 -->
+<!-- dep_data$D2_comb2 <- dep_data$D2_comb -->
+<!-- dep_data$D2_comb2$gene_score_SDs <- sqrt(dep_data$D2_comb$gene_score_SDs^2 + SD_offset^2) -->
 
-SD_offset <- 0.05
-dep_data$D2_comb2 <- dep_data$D2_comb
-# cur_prec <- 1/dep_data$D2_comb2$gene_score_SDs^2
-# in_DRIVE_CLs <- rownames(cur_prec) %in% DRIVE_CLs
-# cur_prec[in_DRIVE_CLs,] <- scale(cur_prec[in_DRIVE_CLs,], center = FALSE, scale = colSums(cur_prec[in_DRIVE_CLs,], na.rm=T))
-# cur_prec[!in_DRIVE_CLs,] <- scale(cur_prec[!in_DRIVE_CLs,], center = FALSE, scale = colSums(cur_prec[!in_DRIVE_CLs,], na.rm=T))
-# dep_data$D2_comb2$gene_score_SDs <- sqrt(1/cur_prec)
-dep_data$D2_comb2$gene_score_SDs <- sqrt(dep_data$D2_comb$gene_score_SDs^2 + SD_offset^2)
-# dep_data$D2_comb2$gene_score_SDs <- matrix(1, nrow = nrow(dep_data$D2_comb$gene_scores), ncol = ncol(dep_data$D2_comb$gene_scores)) %>%
-#   set_colnames(colnames(dep_data$D2_comb$gene_scores)) %>%
-  # set_rownames(rownames(dep_data$D2_comb$gene_scores))
-
-```
+<!-- ``` -->
 
 
 ```{r, include = FALSE}
-target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D2_comb2')
+target_dsets <- c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb','D1_merge')
 bench_res_overlap <- get_target_biomarker_dep_cors(target_dsets, 
                                                     CRISPR_benchmarks, 
                                                     feature_data, 
@@ -2345,14 +2433,15 @@ with(bench_cors_overlap, sum(!is.na(D2_comb) & !is.na(D2_DRIVE)))
 The D2 combined dataset also shows improved agreeement between dependencies and expected biomarkers using the curated benchmark set of dependency/biomarker pairs, giving correlations comprable to those found using CRISPR data. Again, this is using the set of CLs and genes overlapping between Achilles, DRIVE, and CRISPR datasets.
 
 ```{r, fig.width=5, fig.height=4.5}
-map_names <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', 
-               GA_comb = 'GA comb')
-df <- bench_cors_overlap[, target_dsets] %>% melt()
-ggplot(df %>% filter(variable %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% mutate(variable = map_names[variable],
-                                                                                             variable = factor(variable, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb'))), aes(abs(value), color = variable)) + 
+map_names <- c(D2_Ach = 'D2 Ach', D2_DRIVE = 'D2 DRIVE', D2_comb = 'D2 comb', GA_comb = 'GA comb', D1_merge = 'D1 comb')
+df <- bench_cors_overlap[, target_dsets] %>% 
+  melt() %>% 
+  mutate(variable = as.character(variable))
+ggplot(df %>% filter(variable %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D1_merge')) %>% mutate(variable = map_names[variable],
+                                                                                             variable = factor(variable, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb', 'D1 comb'))), aes(abs(value), color = variable)) + 
     stat_ecdf(size = 0.6) +
     scale_x_reverse() +
-    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3), nrow = 2)) +
     xlab('Feature-dep. corr. magnitude') +
     ylab('CDF') + 
     xlim(0.6, 0.2) +
@@ -2369,7 +2458,9 @@ ggsave(file.path(fig_dir, 'combined_bench_ecdf.png'), width = 3.5, height = 3, d
 ```
 
 ```{r}
-df <- bench_cors_overlap[, c(target_dsets)] %>% melt()
+df <- bench_cors_overlap[, c(target_dsets)] %>% 
+  melt() %>% 
+  mutate(variable = as.character(variable))
 df %<>% 
     group_by(variable) %>% 
     summarise(n_strong = sum(abs(value) > bench_cor_thresh, na.rm=T),
@@ -2398,22 +2489,23 @@ The statistical power provided by the combined D2 dataset is also substantially 
 
 ```{r, fig.width=5, fig.height=4.5}
 cur_bench_p <- bench_p %>% filter(Dep_Gene_ID %in% RNAi_common_genes)
-df <- cur_bench_p[, names(dep_datasets)] %>%
+df <- cur_bench_p[,  c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D1_merge')] %>%
     melt() %>% 
     set_colnames(c('dset', 'p.value')) %>% 
     group_by(dset) %>% 
     mutate(q.value = p.adjust(p.value, method = 'BH')) %>% 
     ungroup()
 
-ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>% 
-           mutate(dset = map_names[as.vector(dset)],
-                  dset = factor(dset, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb'))), 
+ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb', 'D1_merge')) %>% 
+           mutate(dset = as.character(dset),
+                  dset = map_names[as.vector(dset)],
+                  dset = factor(dset, levels = c('D2 comb', 'D2 DRIVE', 'D2 Ach', 'GA comb', "D1 comb"))), 
                      aes(-log10(p.value), color = dset)) + 
     stat_ecdf(size = 0.6) +
     scale_x_reverse() +
     xlim(60,0) +
     ylim(0, 1.0) +
-    guides(color = guide_legend(title = '', override.aes = list(size = 3))) +
+    guides(color = guide_legend(title = '', override.aes = list(size = 3), nrow = 2)) +
     xlab('Feature-dep corr -log10(p-value)') +
     ylab('CDF') + 
     # scale_colour_Publication() +
@@ -2421,7 +2513,7 @@ ggplot(df %>% filter(dset %in% c('D2_Ach', 'D2_DRIVE', 'D2_comb', 'GA_comb')) %>
     theme_Publication(base_font) 
     # theme(legend.text = element_text(size = rel(0.95)))
 
-ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 3.5, height = 3.25, dpi = 350)
+ggsave(file.path(fig_dir, 'combined_bench_qvalues.png'), width = 3.75, height = 3.5, dpi = 350)
 
 max_comb <- cur_bench_p %>% 
   filter(D2_comb > 0) %>% 
@@ -2670,8 +2762,21 @@ rel_an %<>% mutate(MDP = NA,
   MDP = ifelse(source %in% c('CORUM', 'ppi'), "interacting protein", MDP)
 ) 
 
+rel_an %<>% mutate(MDP_ord = plyr::revalue(MDP, 
+                                 c(Cyclops = 5,
+                                   `Onc mut` = 4,
+                                   `Onc exp` = 3,
+                                   `paralog loss` = 2,
+                                   `interacting protein` = 1)))
+
 #only count pairs once per relationship type
 rel_an %<>% distinct(dset, feat_gene, targ_gene, MDP, .keep_all=T)
+
+#single MDP per target feature pair
+rel_an %<>% group_by(dset, targ_gene, feat_gene) %>% 
+  top_n(1, wt = MDP_ord) %>% 
+  ungroup()
+
 
 MDP_plot_order <- c('Cyclops', 'interacting protein', 'paralog loss', 'Onc exp', 'Onc mut')
 
@@ -2777,27 +2882,43 @@ ggplot(cur_res, aes(D1_best, D2)) +
 
 export_fig('CYCLOPS_corr_compare', width = 3.5, height = 3.5)
 
+D1_cyclops <- rel_an %>% 
+  filter(dset %in% c('D1_Ach', 'D1_DRIVE'), MDP == 'Cyclops') %>% 
+  .[['targ_gene']] %>% 
+  unique()
+D2c_cyclops <- rel_an %>% 
+  filter(dset %in% c('D2_comb'), MDP == 'Cyclops') %>% 
+  .[['targ_gene']] %>% 
+  unique()
+known_cyclops <- cur_res %>% 
+  filter(is_Ach_CYCLOPS | is_DRIVE_CYCLOPS) %>% 
+  .[['targ_gene']]
+print(sprintf('%d total CYCLOPS, %d unique to D2 combined, %d not known',
+              nrow(all_cyclops), length(setdiff(D2c_cyclops, D1_cyclops)), length(setdiff(D2c_cyclops, known_cyclops))))
 ```
 
 ```{r}
+rel_an %<>% mutate(target_partner = paste0(target, '_', partner),
+                   targ_part_ID = paste0(targ_gene, '_', feat_gene))
 D2_unique <- rel_an %>% 
   filter(dset == 'D2_comb') %>% 
-  distinct(targ_gene) %>% 
-  .[['targ_gene']] %>% 
+  distinct(targ_part_ID) %>% 
+  .[['targ_part_ID']] %>% 
   setdiff(rel_an %>%
             filter(dset %in% c('D1_Ach', 'D1_DRIVE')) %>% 
-            distinct(targ_gene) %>% 
-            .[['targ_gene']])
+            distinct(targ_part_ID) %>% 
+            .[['targ_part_ID']])
 
 D2_unique_rel_an <- rel_an %>% 
   filter(!is.na(MDP)) %>% 
-  filter(targ_gene %in% D2_unique, dset == 'D2_comb') %>% 
+  filter(targ_part_ID %in% D2_unique, dset == 'D2_comb') %>% 
   left_join(gene_avgs %>% filter(dset == 'D2_comb'), 
             by = c('targ_gene' = 'Gene'))
 
 D2_unique_rel_an %<>% mutate(MDP = factor(MDP, levels = MDP_plot_order))
 cur_cols <- hue_pal()(5) %>% set_names(MDP_plot_order)
 
+D2_unique_rel_an %<>% mutate(target_partner = str_replace_all(target_partner, '_', '/'))
 ggplot(D2_unique_rel_an, aes(avg_score, abs(cor), color = MDP)) + 
   geom_point() +
   xlab('Cell line avg dependency') +
@@ -2807,7 +2928,7 @@ ggplot(D2_unique_rel_an, aes(avg_score, abs(cor), color = MDP)) +
   geom_label_repel(data = D2_unique_rel_an %>% 
                      arrange(desc(abs(cor))) %>% 
                      head(10),
-                   aes(label = target), size = 2,
+                   aes(label = target_partner), size = 2,
                    label.padding = 0.15, show.legend = F) +
   scale_color_manual(values = cur_cols)
 export_fig('new_MDP_scatter', width = 3.5, height = 3.5)
@@ -3743,20 +3864,21 @@ p <- grid.arrange(arrangeGrob(p1 + theme(legend.position="none"),
 
 export_fig('norm_methods_CRISPR_benchcors', width = 6, height = 3.5, plot = p)
 
-bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(cor, model, Dep_Gene_ID) %>% mutate(cor = abs(cor)) %>% 
-                                  distinct(model, Dep_Gene_ID, .keep_all=T), model, cor)
+# bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(cor, model, Dep_Gene_ID) %>% mutate(cor = abs(cor)) %>% distinct(model, Dep_Gene_ID, .keep_all=T), model, cor)
 
-print('Wilcox test D1 Ach vs PCN')
-with(bench_res_test_spread, wilcox.test(D1_Ach, D1PC_Ach, paired = TRUE))
-with(bench_res_test_spread, median(D1_Ach - D1PC_Ach, na.rm=T))
-print('N_used')
-with(bench_res_test_spread, sum(!is.na(D1PC_Ach) & !is.na(D1_Ach)))
+bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(-p.value, -ptype, -mod) %>% mutate(cor = abs(cor)), model, cor)
 
-print('Wilcox test D1 DRIVE vs PCN')
-with(bench_res_test_spread, wilcox.test(D1_DRIVE, D1PC_DRIVE, paired = TRUE))
-with(bench_res_test_spread, median(D1_DRIVE - D1PC_DRIVE, na.rm=T))
-print('N_used')
-with(bench_res_test_spread, sum(!is.na(D1PC_DRIVE) & !is.na(D1_DRIVE)))
+compare_bench_results <- function(bench_res_spread, type1, type2) {
+  print(sprintf('Comparing bench results for %s vs %s', type1, type2))
+  print(sprintf("Wilcox p: %.3g", wilcox.test(bench_res_spread[[type1]], bench_res_spread[[type2]], paired = TRUE)$p.value))
+  print(sprintf("Med diff p: %.4f", median(bench_res_spread[[type1]] - bench_res_spread[[type2]], na.rm=T)))
+  print(sprintf("N shared p: %d", sum(!is.na(bench_res_spread[[type1]]) & !is.na(bench_res_spread[[type2]]))))
+}
+
+compare_bench_results(bench_res_test_spread, 'GA_Ach', 'GAPN_Ach')
+compare_bench_results(bench_res_test_spread, 'GA_DRIVE', 'GAPN_DRIVE')
+compare_bench_results(bench_res_test_spread, 'D1_Ach', 'D1PC_Ach')
+compare_bench_results(bench_res_test_spread, 'D1_DRIVE', 'D1PC_DRIVE')
 
 ```
 
