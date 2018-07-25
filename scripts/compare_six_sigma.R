@@ -11,17 +11,17 @@ library(taigr)
 dat <- load.all.from.taiga(list(
   Ach_GS = list( 
     data.name='demeter2-achilles-5386',
-    data.version=10,
+    data.version=12,
     data.file = 'gene_means_proc',
     transpose = T),
   Ach_CL_data = list( 
       data.name='demeter2-achilles-5386',
-      data.version=10,
+      data.version=12,
       data.file = 'CL_data_comb',
       transpose = F),
   Ach_SD = list( 
     data.name='demeter2-achilles-5386',
-    data.version=10,
+    data.version=12,
     data.file = 'gene_SDs_proc',
     transpose = T),
   Ach_D1_old  = list(data.name='demeter-2-20-2-z-scored-gene-solutions-expanded-gene-families-', 
@@ -33,7 +33,7 @@ dat <- load.all.from.taiga(list(
 
 #mean subtract per gene
 dat$Ach_GS %<>% scale(center = T, scale = F)
-dat$Ach_D1_old_r %<>% scale(center = T, scale = F)
+dat$Ach_D1_old %<>% scale(center = T, scale = F)
 
 #global z-score normalization
 dat$Ach_SD  <- dat$Ach_SD / sd(dat$Ach_GS, na.rm=T)

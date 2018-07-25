@@ -16,9 +16,9 @@ library(weights)
 library(cdsr)
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/rev_figures'
+fig_dir <- '~/CPDS/demeter2/results/figures'
 fig_width <- 3.5
-fig_height <- 3.
+fig_height <- 3.0
 
 sim_folder <- '~/CPDS/demeter2/kube_results/sim_run_n_CLs'
 res_dirs <- list.files(sim_folder, include.dirs = TRUE)
@@ -177,7 +177,7 @@ all_res_g %>%
   scale_x_log10() +
   theme_Publication() +
   xlab('N genes') + 
-  ylab('Gene dep fit R2') +
+  ylab('Gene dependency fit R2') +
   scale_color_manual(values = mod_type_pal)
 ggsave(file.path(fig_dir, 'gene_dep_ov_R2_vs_n_genes.png'), width = fig_width, height = fig_height, dpi = 350)
 

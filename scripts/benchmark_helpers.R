@@ -222,7 +222,9 @@ get_dep_feat_cors_ <- function(dep_dset, targ_gene, features, feat_gene,use_baye
   feat_cors_z <- (feat_cors - mean(feat_cors, na.rm=T))/sd(feat_cors, na.rm=T)
   return(feat_cors_z[feat_gene])
 }
-get_best_assoc <- function(dep_dset, targ_gene, feat_gene, z_score = FALSE) {
+
+#get stronger correlation (magnitude) between dependency and either the gene's own CN or GE
+get_best_assoc <- function(dep_dset, targ_gene, feat_gene, z_score = FALSE, use_abs = TRUE) {
   if (!(targ_gene %in% colnames(dep_data[[dep_dset]]$gene_scores))) {
     return(NA)
   }
@@ -254,8 +256,35 @@ get_best_assoc <- function(dep_dset, targ_gene, feat_gene, z_score = FALSE) {
   } else {
     CN_cor <- NA
   }
-  return(pmax(abs(GE_cor), abs(CN_cor), na.rm=T))
+  if (use_abs) {
+    return(pmax(abs(GE_cor), abs(CN_cor), na.rm=T))
+  } else {
+    if (is.na(GE_cor) & is.na(CN_cor)) {return(NA)}
+    if (is.na(GE_cor)) {GE_cor <- 0}
+    if (is.na(CN_cor)) {CN_cor <- 0}
+    if (abs(GE_cor) > abs(CN_cor)) {
+      return(GE_cor)
+    } else {
+      return(CN_cor)
+    }
+  }
 }
+
+
+#get correlation between dependency and feature
+get_spec_assoc <- function(dep_dset, targ_gene, feat_gene, feat_type, use_bayes = TRUE) {
+  if (!(targ_gene %in% colnames(dep_data[[dep_dset]]$gene_scores))) {
+    return(NA)
+  }
+  if (!(feat_gene %in% colnames(feature_data[[feat_type]]))) {
+    return(NA)
+  }
+  return(get_dep_feat_cor_(dep_dset, targ_gene,
+                               feature_data[[feat_type]][, feat_gene],
+                               use_bayes = use_bayes)
+  )
+}
+
 
 
 renorm_gene_scores <- function(mod) {
@@ -598,8 +627,11 @@ clean_CL_names_with_missing <- function(CL_names) {
     return(new_names)
 }
 
-
-load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include_gene_families = FALSE, use_bayes=TRUE, name_map = NULL) {
+#load specified set of dependency dataset, and apply some initial preprocessing
+load_all_dep_data <- function(dep_dnames, 
+                              dep_datasets, 
+                              include_gene_families = FALSE, 
+                              use_bayes=TRUE) {
     dep_data <- lapply(dep_dnames, function(dep_name) {
         print(sprintf('Loading %s', dep_name))
         cur_dep_info <- dep_datasets[[dep_name]]
@@ -615,13 +647,14 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
                     cur_dep_info$gene_score_SDs <- unpack_gene_families(cur_dep_info$gene_score_SDs)
                 }
             } else {
+              #throw out gene families, which include gene names catted with &
                 cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !grepl('&', colnames(cur_dep_info$gene_scores))]
                 if (use_bayes) {
                     cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[, !grepl('&', colnames(cur_dep_info$gene_score_SDs))]
                 }
             }
         }
-        if (cur_dep_info$mod_type == 'D1') {
+        if (cur_dep_info$mod_type %in% c('D1', 'GA', 'RSA', 'mageck', 'ATARiS')) {
             #load this from taiga
             cur_dep_info$gene_scores <- load.from.taiga(
                 data.name=cur_dep_info$taiga_name,
@@ -631,28 +664,10 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
             if (grepl('\\(', colnames(cur_dep_info$gene_scores)[1])) {
                 colnames(cur_dep_info$gene_scores) <- str_match(colnames(cur_dep_info$gene_scores), '\\((.+)\\)')[,2]
             }
-        }
-        if (cur_dep_info$mod_type == 'GA' | cur_dep_info$mod_type == 'RSA' | cur_dep_info$mod_type == 'mageck') {
-            #load this from taiga
-            cur_dep_info$gene_scores <- load.from.taiga(
-                data.name=cur_dep_info$taiga_name,
-                data.version=cur_dep_info$taiga_version,
-                data.file = cur_dep_info$taiga_file,
-                transpose = T)
-
-            colnames(cur_dep_info$gene_scores) <-
-                str_match(colnames(cur_dep_info$gene_scores), ' \\((.+)\\)')[,2]
-            cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !duplicated(colnames(cur_dep_info$gene_scores))]
-        }
-        if (cur_dep_info$mod_type == 'ATARiS') {
-            #load this from taiga
-            cur_dep_info$gene_scores <- load.from.taiga(
-                data.name=cur_dep_info$taiga_name,
-                data.version=cur_dep_info$taiga_version,
-                transpose = T)
-            colnames(cur_dep_info$gene_scores) <-
-                str_match(colnames(cur_dep_info$gene_scores), ' \\((.+)\\)')[,2]
-            cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !duplicated(colnames(cur_dep_info$gene_scores))]
+            if (sum(duplicated(colnames(cur_dep_info$gene_scores))) > 0) {
+              print('removing duplicated genes')
+              cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !duplicated(colnames(cur_dep_info$gene_scores))]
+            }
         }
         if (cur_dep_info$mod_type == 'CERES') {
             #load this from taiga
@@ -663,61 +678,33 @@ load_all_dep_data <- function(dep_dnames, dep_datasets, black_list = NA, include
                 transpose = F)
             colnames(cur_dep_info$gene_scores) <-
                 str_match(colnames(cur_dep_info$gene_scores), ' \\((.+)\\)')[,2]
-            # new_ceres <- load.from.taiga(data.name='avana-564b', data.version=18, data.file='gene_effect')
-            # ceres_gsym <- str_match(colnames(new_ceres), '(.+) \\(.+\\)')[,2]
-            # ceres_gid <- str_match(colnames(new_ceres), ' \\((.+)\\)')[,2]
-            # ceres_gmap <- ceres_gid %>% set_names(ceres_gsym)
-            # colnames(cur_dep_info$gene_scores) <- ceres_gmap[colnames(cur_dep_info$gene_scores)]
-            # new_ceres <- NULL #clear from mem
-            # colnames(cur_dep_info$gene_scores) <-
-            #     str_match(colnames(cur_dep_info$gene_scores), ' \\((.+)\\)')[,2]
         }
-        # if (cur_dep_info$mod_type == 'ATARiS') {
-        #     cur_dep_info$gene_scores <- read_ATARiS_data(cur_dep_info$path)
-        #     if (unpack_gene_families) {
-        #         cur_dep_info$gene_scores <- unpack_gene_families(cur_dep_info$gene_scores)
-        #     } else {
-        #         cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !grepl('&', colnames(cur_dep_info$gene_scores))]
+        # if (cur_dep_info$dataset == 'DRIVE' | cur_dep_info$dataset == 'Marcotte') {
+        #     #map CL names to CCLE_ID, and only take those in CCLE
+        #     rownames(cur_dep_info$gene_scores) <- clean_CL_names_with_missing(rownames(cur_dep_info$gene_scores))
+        #     cur_dep_info$gene_scores <- cur_dep_info$gene_scores[!is.na(rownames(cur_dep_info$gene_scores)),]
+        #     if (cur_dep_info$mod_type == 'D2' & use_bayes) {
+        #         rownames(cur_dep_info$gene_score_SDs) <- clean_CL_names_with_missing(rownames(cur_dep_info$gene_score_SDs))
+        #         cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[!is.na(rownames(cur_dep_info$gene_score_SDs)),]
         #     }
         # }
-        if (cur_dep_info$dataset == 'DRIVE' | cur_dep_info$dataset == 'Marcotte') {
-            #map CL names to CCLE_ID, and only take those in CCLE
-            rownames(cur_dep_info$gene_scores) <- clean_CL_names_with_missing(rownames(cur_dep_info$gene_scores))
-            cur_dep_info$gene_scores <- cur_dep_info$gene_scores[!is.na(rownames(cur_dep_info$gene_scores)),]
-            if (cur_dep_info$mod_type == 'D2' & use_bayes) {
-                rownames(cur_dep_info$gene_score_SDs) <- clean_CL_names_with_missing(rownames(cur_dep_info$gene_score_SDs))
-                cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[!is.na(rownames(cur_dep_info$gene_score_SDs)),]
-            }
-        }
-        if (length(black_list) > 0) {
-            cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, !(colnames(cur_dep_info$gene_scores) %in% black_list)]
-            if (cur_dep_info$mod_type == 'D2' & use_bayes) {
-                cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[, !(colnames(cur_dep_info$gene_score_SDs) %in% black_list)]
-            }
-        }
+        
         #ignore genes which are NA for all cell lines
         used_genes <- colSums(!is.na(cur_dep_info$gene_scores)) > 0
         cur_dep_info$gene_scores <- cur_dep_info$gene_scores[, used_genes]
         if (cur_dep_info$mod_type == 'D2' & use_bayes) {
             cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[, used_genes]
         }
-        #ignore XLOC genes
-        cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,!grepl('XLOC', colnames(cur_dep_info$gene_scores))]
-        if (cur_dep_info$mod_type == 'D2' & use_bayes) {
-            cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,!grepl('XLOC', colnames(cur_dep_info$gene_score_SDs))]
-        }
-        #ignore non Entrez genes
-        cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,grepl('[0-9]', colnames(cur_dep_info$gene_scores))]
-        if (cur_dep_info$mod_type == 'D2' & use_bayes) {
-          cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,grepl('[0-9]', colnames(cur_dep_info$gene_score_SDs))]
-        }
-        
-        if (!is.null(name_map)) {
-          rownames(cur_dep_info$gene_scores) %<>% plyr::revalue(name_map)
-          if (!is.null(cur_dep_info$gene_score_SDs)) {
-            rownames(cur_dep_info$gene_score_SDs) %<>% plyr::revalue(name_map)
-          }
-        }
+        # #ignore XLOC genes
+        # cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,!grepl('XLOC', colnames(cur_dep_info$gene_scores))]
+        # if (cur_dep_info$mod_type == 'D2' & use_bayes) {
+        #     cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,!grepl('XLOC', colnames(cur_dep_info$gene_score_SDs))]
+        # }
+        # #ignore non Entrez genes
+        # cur_dep_info$gene_scores <- cur_dep_info$gene_scores[,grepl('[0-9]', colnames(cur_dep_info$gene_scores))]
+        # if (cur_dep_info$mod_type == 'D2' & use_bayes) {
+        #   cur_dep_info$gene_score_SDs <- cur_dep_info$gene_score_SDs[,grepl('[0-9]', colnames(cur_dep_info$gene_score_SDs))]
+        # }
         cur_dep_info$mod <- NULL
         return(cur_dep_info)
     })
@@ -738,16 +725,10 @@ load_all_feature_data <- function(feature_dnames, feature_datasets, all_dep_gene
             data.file = cur_feature_info$data.file,
             transpose = cur_feature_info$transpose)
         if (feature_name == 'GE') {
-            # colnames(cur_data) <- str_match(colnames(cur_data), '(.+) ')[, 2]
             colnames(cur_data) <- str_match(colnames(cur_data), ' \\((.+)\\)')[, 2]
-            # gene_IDs <- read.csv('~/CPDS/demeter2/data/hugo_to_entrez_GE.csv', stringsAsFactors = F, check.names = F)
-            # gene_IDs %<>% distinct(`query`, .keep_all=T)
-            # conv <- gene_IDs$X_id %>% set_names(gene_IDs$query)
-            # colnames(cur_data) <- conv[colnames(cur_data)]
             cur_data <- cur_data[, !duplicated(colnames(cur_data))] #get rid of any duplicated columns
         }
         if (feature_name == 'CN') {
-            # rownames(cur_data) <- str_match(rownames(cur_data), '^[:alnum:]+_(.+)')[,2]
             colnames(cur_data) <- str_match(colnames(cur_data), ' \\((.+)\\)')[, 2]
         }
         if (feature_name %in% c('MUT_MIS', 'MUT_DAM', 'MUT_HOT')) {
@@ -777,6 +758,7 @@ load_all_feature_data <- function(feature_dnames, feature_datasets, all_dep_gene
         feature_data <- feature_data[setdiff(names(feature_data), 'MUT')]
     }
 
+    #subset feature datasets to use only specified lists of genes and CLs
     for (feature_dname in names(feature_data)) {
         if (!is.null(all_dep_genes)) {
             feature_data[[feature_dname]] <- feature_data[[feature_dname]][, colnames(feature_data[[feature_dname]]) %in% all_dep_genes]
@@ -968,7 +950,7 @@ data_available <- function(feature_genes, feature_types, feature_data) {
     is_avail[feature_types == 'GE'] <- feature_genes[feature_types == 'GE'] %in% colnames(feature_data$GE)
     is_avail[feature_types == 'MUT_DAM'] <- feature_genes[feature_types == 'MUT_DAM'] %in% colnames(feature_data$MUT_DAM)
     is_avail[feature_types == 'MUT_HOT'] <- feature_genes[feature_types == 'MUT_HOT'] %in% colnames(feature_data$MUT_HOT)
-    is_avail[feature_types == 'MUT_MIS'] <- feature_genes[feature_types == 'MUT_MIS'] %in% colnames(feature_data$MUT_HOT)
+    is_avail[feature_types == 'MUT_MIS'] <- feature_genes[feature_types == 'MUT_MIS'] %in% colnames(feature_data$MUT_MIS)
     return(is_avail)
 }
 
@@ -1081,9 +1063,10 @@ get_gene_avg_stats <- function(dep_data, gene_avgs, target_dsets, only_overlappi
     })
 }
 
+#calculate gene dep stats for each cell line
 get_per_CL_stats <- function(dep_data, target_dsets, only_overlapping_genes, neg_control_type,
                              GE_mat, pos_cons, neg_cons, use_bayes = TRUE) {
-    #Calculate pos-neg control sep for each CL
+    #Genes present in all target datasets
     common_dep_genes <- Reduce(intersect, llply(target_dsets, function(dname) {
         colnames(dep_data[[dname]]$gene_scores)
         }))
@@ -1144,7 +1127,163 @@ get_per_CL_stats <- function(dep_data, target_dsets, only_overlapping_genes, neg
     })
 }
 
-##PLOTTING HELPERS
+get_dep_corrs <- function(dep_data, target_dsets, target_genes, gene_avgs, use_bayes = TRUE) {
+    dep_cor_res <- ldply(target_dsets, function(cur_dset) {
+    print(cur_dset) 
+    if (use_bayes & !is.null(dep_data[[cur_dset]]$gene_score_SDs)) {
+      #use average gene-level variance for precision weighting
+      CL_avg_var <- rowMeans(dep_data[[cur_dset]]$gene_score_SDs^2, na.rm=T)
+      cur_weight <- 1/CL_avg_var
+      c_mat <- wtd.cors(dep_data[[cur_dset]]$gene_scores[, target_genes], weight = cur_weight)
+    } else {
+      c_mat <- cor(dep_data[[cur_dset]]$gene_scores[, target_genes], use = 'pairwise.complete.obs')
+    }
+    #calculate average essentiality of each gene pair in the matrix
+    if (grepl('Ach', cur_dset)) {
+      avg_ess <- gene_avgs %>% 
+        filter(dset == 'D2_Ach')
+    } else if (grepl('DRIVE', cur_dset)) {
+      avg_ess <- gene_avgs %>% 
+        filter(dset == 'D2_DRIVE')
+    }
+    avg_ess <- avg_ess[match(target_genes, avg_ess$Gene), 'avg_score']
+    a <- outer(avg_ess, avg_ess, '+') / 2
+    a <- a[lower.tri(a)]
+    c_mat <- c_mat[lower.tri(c_mat)]
+    
+    data.frame(cor = c_mat, a = a, dset = cur_dset)
+  })
+  return(dep_cor_res)
+}
+
+
+normalize_genescores_global_z <- function(cur_data) {
+  if (!is.null(cur_data$gene_score_SDs)) {
+    cur_data$gene_score_SDs <- cur_data$gene_score_SDs / sd(cur_data$gene_scores, na.rm=T)
+  }            
+  cur_data$gene_scores <- cur_data$gene_scores / sd(cur_data$gene_scores, na.rm=T)
+  return(cur_data)
+}
+
+normalize_genescores_posneg <- function(cur_data, hart_ess, hart_non_ess, cur_GA, normalize_D2_per_CL = FALSE) {
+  if (normalize_D2_per_CL & cur_data$mod_type == 'D2') {
+    cur_pos_set <- as.character(hart_ess[hart_ess %in% colnames(cur_data$gene_scores)])
+    cur_neg_set <- as.character(hart_non_ess[hart_non_ess %in% colnames(cur_data$gene_scores)])
+    cur_pos_medians <- apply(cur_data$gene_scores[, cur_pos_set], 1, median, na.rm=T)
+    cur_neg_medians <- apply(cur_data$gene_scores[, cur_neg_set], 1, median, na.rm=T)
+    cur_scale_facs <- pmax(cur_neg_medians - cur_pos_medians, 0.001)
+    if (!is.null(cur_data$gene_score_SDs)) {
+      cur_data$gene_score_SDs %<>% t() %>% scale(center = FALSE, scale = cur_scale_facs) %>% t()
+    }
+    cur_data$gene_scores %<>% t() %>% scale(center = cur_neg_medians, scale = cur_scale_facs) %>% t()
+  } else {
+    # cur_GA <- cur_gene_avgs %>% filter(dset == cur_dset)
+    pos_median <- cur_GA %>% filter(gene_type == 'essential') %>% .[['avg_score']] %>% median(na.rm=T)
+    neg_median <- cur_GA %>% filter(gene_type == 'non_essential') %>% .[['avg_score']] %>% median(na.rm=T)
+    if (!is.null(cur_data$gene_score_SDs)) {
+      cur_data$gene_score_SDs <- cur_data$gene_score_SDs / (neg_median - pos_median)
+    }
+    cur_data$gene_scores <- (cur_data$gene_scores - neg_median) / (neg_median - pos_median)
+  }
+  return(cur_data)
+}
+
+
+print_paired_two_group_stats <- function(var1, var2) {
+  print(sprintf(
+    'Wilcox p: %.3g',
+    wilcox.test(var1, var2, paired = TRUE)$p.value
+  ))
+  
+  print(sprintf(
+    'Num used: %d',
+    sum(!is.na(var1) & !is.na(var2))
+  ))
+  
+  print(sprintf(
+    'Median improvement: %.3f',
+    median((var1 - var2)/var1, na.rm=TRUE)
+  ))
+}
+
+
+###----------  PLOTTING HELPERS #########
+
+make_net_plot <- function(cur_df, C_mat) {
+  max_nodes <- 25
+  min_size <- 10
+  max_size <- 30
+  cor_z_thresh <- 4
+  
+  #get max_nodes top correlated dependencies
+  node_df <- cur_df %>% 
+    arrange(desc(abs(cor))) %>% 
+    head(max_nodes) %>%
+    mutate(id = Gene,
+           label = Gene_symbol)
+  
+  node_df$color <- 'black'
+  node_df %<>% mutate(
+    color = ifelse(is_related, 'pink', 'lightgray'),
+    color = ifelse(Gene == q_gene_ID, 'skyblue', color)
+  )
+  
+  edge_df <- 
+    C_mat[node_df$Gene, node_df$Gene] %>% 
+    melt() %>% 
+    set_colnames(c('from', 'to', 'cor')) %>% 
+    mutate(cor_rank = percent_rank(-abs(cor)),
+           cor = abs(cor)) %>% 
+    # filter(cor_rank < cor_rank_thresh, from != to)
+    filter(cor > cor_z_thresh, from != to) 
+  
+  edge_widths <- edge_df$cor/sd(edge_df$cor, na.rm=T)
+  
+  #build initial graph
+  graph <- igraph::graph_from_data_frame(d = edge_df,
+                                         vertices = node_df,
+                                         directed = FALSE)
+  
+  #remove any components that are not connected
+  is_connected <- sapply(node_df$id, function(target_ID) {
+    if (target_ID == q_gene_ID) {
+      return(TRUE)
+    } else {
+      return(igraph::edge_connectivity(graph, source = q_gene_ID, target = target_ID) > 0)
+    }
+  })
+  node_df %<>% 
+    mutate(is_connected = is_connected) %>% 
+    filter(is_connected)
+  edge_df %<>% filter(to %in% node_df$id, from %in% node_df$id)
+  
+  #rebuild graph
+  graph <- igraph::graph_from_data_frame(d = edge_df,
+                                         vertices = node_df,
+                                         directed = FALSE)
+  
+  #node size represents how common-essential each gene is
+  vertex_size <- -node_df[["avg_score"]] 
+  vertex_size <- vertex_size*(max_size - min_size) + min_size
+  vertex_size[is.na(vertex_size)] <- mean(vertex_size, na.rm=T)
+  
+  igraph::plot.igraph(graph,
+                      vertex.label.dist = 0,
+                      vertex.label = node_df$label,
+                      vertex.label.color = 'black',
+                      vertex.frame.color = 'black',
+                      vertex.color = node_df$color,
+                      vertex.size = vertex_size*0.75,
+                      vertex.alpha = 0.75,
+                      vertex.shape = 'circle',
+                      edge.arrow.size = 0,
+                      edge.curved = 0.1,
+                      layout = layout_nicely,
+                      vertex.label.dist=1,
+                      vertex.label.font=2,
+                      vertex.label.cex = 0.7,
+                      edge.width=edge_df$cor*0.2)
+}
 
 g_legend<-function(a.gplot){
     tmp <- ggplot_gtable(ggplot_build(a.gplot))
@@ -1232,7 +1371,7 @@ mod_type_pal <- c(
     ATARiS = "#7fc97f",
     D1 = "#ef3b2c",
     CERES = "gray",
-    Mageck = 'darkmagenta',
+    MAGeCK = 'darkmagenta',
     `D1-PC` = 'lightgreen',
     `GA-indnorm` = 'magenta'
 )

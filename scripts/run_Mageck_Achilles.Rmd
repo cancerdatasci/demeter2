@@ -57,8 +57,19 @@ get_CL_names <- function(data) {
     return(cleaned_CL_names)
 }
 
+get_tot_counts <- function(data_path, remove_list) {
+  if (str_detect(data_path, '.gct')) {
+   counts_data <- read.gct(data_path)
+  } else {
+    counts_data <- jmmBase::load_matrix_fast(data_path)
+  }
+  colnames(counts_data) <- proc_names(colnames(counts_data))
+  counts_data %<>% remove_from_list(remove_list)
+  tot_counts <- colSums(counts_data)
+  return(tot_counts)
+}
 
-build_mageck_inputs <- function(data_path, sh_targets, remove_list) {
+build_mageck_inputs <- function(data_path, sh_targets, remove_list, scale_factors = NULL) {
   if (str_detect(data_path, '.gct')) {
      counts_data <- read.gct(data_path)
   } else {
@@ -67,6 +78,11 @@ build_mageck_inputs <- function(data_path, sh_targets, remove_list) {
   colnames(counts_data) <- proc_names(colnames(counts_data))
   counts_data %<>% remove_from_list(remove_list)
 
+  if (!is.null(scale_factors)) {
+    stopifnot(all(colnames(counts_data) %in% names(scale_factors)))
+    counts_data %<>% scale(center = F, scale = scale_factors[colnames(counts_data)])
+  }
+  
   #separate sample and pDNA
   pDNA_samples <- counts_data[, grepl('pdna', colnames(counts_data), ignore.case = T), drop = FALSE]
   counts_data <- counts_data[, !grepl('pdna', colnames(counts_data), ignore.case = T), drop = FALSE]
@@ -137,6 +153,27 @@ temp_dir <- '~/CPDS/mageck_temp_data'
 
 <!-- ``` -->
 
+
+```{r}
+# Get vector of library sizes
+remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1)
+data_path <- file.path(data_dir, 'cBOTv7_sbsv2_allreplicates_sums.gct')
+cBotv7_tot_counts <- get_tot_counts(data_path, remove_list_55k)
+
+data_path <- file.path(data_dir, 'cBOTv8_sbsv3_allreplicates_sums.gct')
+cBotv8_tot_counts <- get_tot_counts(data_path, remove_list_55k)
+
+remove_list_98k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_98k.txt'), col_names = FALSE)$X1)
+data_path <- file.path(data_dir, 'Achilles98k_20150515_AllReplicates_20150515_rawReadCounts.csv')
+x98k_tot_counts <- get_tot_counts(data_path, remove_list_55k)
+
+all_tot_counts <- c(cBotv7_tot_counts, cBotv8_tot_counts, x98k_tot_counts)
+
+median_library_size <- median(all_tot_counts)
+scale_factors <- all_tot_counts / median_library_size
+```
+
+
 ```{r}
 expt_name <- 'cBOTv7'
 setwd('~/CPDS/demeter2/results/mageck/Ach_cBOTv7/')
@@ -144,7 +181,7 @@ setwd('~/CPDS/demeter2/results/mageck/Ach_cBOTv7/')
 remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.txt'), col_names = FALSE)$X1)
 
 data_path <- file.path(data_dir, 'cBOTv7_sbsv2_allreplicates_sums.gct')
-mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k)
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k, scale_factors = scale_factors)
 
 cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
 for (cur_CL in cur_CLs) {
@@ -158,7 +195,7 @@ for (cur_CL in cur_CLs) {
   write_tsv(cur_counts_mat, counts_path)
   write_tsv(cur_design_mat, design_path)
   
-  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method total', cur_CL) 
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method none', cur_CL) 
   system(cmd)
 }
 ```
@@ -185,7 +222,7 @@ remove_list_55k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_55k.
 setwd('~/CPDS/demeter2/results/mageck/Ach_cBOTv8/')
 
 data_path <- file.path(data_dir, 'cBOTv8_sbsv3_allreplicates_sums.gct')
-mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k)
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_55k, scale_factors = scale_factors)
 
 cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
 for (cur_CL in cur_CLs) {
@@ -199,7 +236,7 @@ for (cur_CL in cur_CLs) {
   write_tsv(cur_counts_mat, counts_path)
   write_tsv(cur_design_mat, design_path)
   
-  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method total', cur_CL) 
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 6 --permutation-round 0 --norm-method none', cur_CL) 
   system(cmd)
 }
 ```
@@ -226,7 +263,7 @@ remove_list_98k <- proc_names(read_tsv(file.path(data_dir, 'removelist_reps_98k.
 setwd('~/CPDS/demeter2/results/mageck/Ach_98k/')
 
 data_path <- file.path(data_dir, 'Achilles98k_20150515_AllReplicates_20150515_rawReadCounts.csv')
-mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_98k)
+mageck_data <- build_mageck_inputs(data_path, sh_targets, remove_list = remove_list_98k, scale_factors = scale_factors)
 
 cur_CLs <- setdiff(colnames(mageck_data$design_mat), c('Samples', 'baseline'))
 for (cur_CL in cur_CLs) {
@@ -240,7 +277,7 @@ for (cur_CL in cur_CLs) {
   write_tsv(cur_counts_mat, counts_path)
   write_tsv(cur_design_mat, design_path)
   
-  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 2 --permutation-round 0 --norm-method total', cur_CL) 
+  cmd <- sprintf('/Users/jmmcfarl/anaconda/bin/mageck mle -k ~/CPDS/mageck_temp_data/counts_mat_solo.txt -d ~/CPDS/mageck_temp_data/design_mat_solo.txt -n %s --no-permutation-by-group --threads 2 --permutation-round 0 --norm-method none', cur_CL) 
   system(cmd)
 }
 ```
