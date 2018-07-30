@@ -687,6 +687,7 @@ export_fig('GSavg_Ach_DRIVE_cor', width = 1.5, height = 1.5, 'pdf')
 print(sprintf('Ach-DRIVE D2: %.3f', df[df$dset == 'D2 Ach DRIVE', 'cor']))
 print(sprintf('Ach-DRIVE GA: %.3f', df[df$dset == 'GA Ach DRIVE', 'cor']))
 print(sprintf('Ach-DRIVE RSA: %.3f', df[df$dset == 'RSA Ach DRIVE', 'cor']))
+print(sprintf('Ach-DRIVE MAGeCK: %.3f', df[df$dset == 'MAGeCK Ach DRIVE', 'cor']))
 
 print(sprintf('D2 Ach CRISPR: %.3f', df[df$dset == 'D2 Ach CRISPR', 'cor']))
 print(sprintf('GA Ach CRISPR: %.3f', df[df$dset == 'GA Ach CRISPR', 'cor']))
@@ -1984,6 +1985,7 @@ sprintf('Fold imp D2 comb vs GA DRIVE: %.4f', (temp['total', 'D2 comb']) / (temp
 ```
 
 ## 5e: Broken down by MDP
+
 ```{r}
 #classify MDPs
 rel_an %<>% mutate(MDP = NA,
@@ -2048,250 +2050,7 @@ write_rds(rel_an %>% filter(!is.na(MDP)), '~/CPDS/demeter2/results/top_MDP_stats
 spread(sum_stats, dset,n) %>% DT::datatable()
 ```
 
-##5f: Detailed analysis of biomarkers
-
-```{r}
-Tsherniak_supp <- read.csv('~/CPDS/data/Achilles/shRNA/Tsherniak_supp_table_MDP.csv', stringsAsFactors = F, check.names = F)
-Tsherniak_CYCLOPS <- Tsherniak_supp %>%
-  filter(`MDP feature group` == 'CYCLOPS') %>%
-  .[['Gene dependency']]
-DRIVE_CYCLOPS <- read_lines('~/CPDS/data/Novartis/DRIVE_CYCLOPS.txt')
-
-# #extract Cyclops MDP pairs
-# cyclops <- filter(rel_an, MDP == 'CYCLOPS', dset %in% c('D2_comb', 'D1_Ach', 'D1_DRIVE')) %>%
-#   left_join(Tsherniak_supp, by = c('target' = 'Gene dependency'))
-# all_cyclops <- cyclops %>%
-#   distinct(targ_gene, feat_gene)
-#
-# #for each CYCLOPS gene, get best CN or GE dep-feature correlation for each dep dataset
-# use_zscore <- FALSE
-# cur_res <- adply(all_cyclops, 1, function(row) {
-#   D1_Ach_cors <- get_best_assoc('D1_Ach', row$targ_gene, row$feat_gene, z_score = use_zscore)
-#   D1_DRIVE_cors <- get_best_assoc('D1_DRIVE', row$targ_gene, row$feat_gene, z_score = use_zscore)
-#   D2_comb_cors <- get_best_assoc('D2_comb', row$targ_gene, row$feat_gene, z_score = use_zscore)
-#   return(data.frame(
-#     targ_gene = row$targ_gene,
-#     feat_gene = row$feat_gene,
-#     D2 = D2_comb_cors,
-#     D1_Ach = D1_Ach_cors,
-#     D1_DRIVE = D1_DRIVE_cors
-#   ))
-# }) %>%
-#   mutate(targ_gene = as.character(targ_gene),
-#          feat_gene = as.character(feat_gene),
-#          D1_best = pmax(D1_Ach, D1_DRIVE, na.rm=T),
-#          targ_symbol = Gene_ID_to_symb[targ_gene],
-#          is_Ach_CYCLOPS = targ_symbol %in% Tsherniak_CYCLOPS,
-#          is_DRIVE_CYCLOPS = targ_symbol %in% DRIVE_CYCLOPS,
-#          D2_imp = D2 - D1_best,
-#          is_new = !is_Ach_CYCLOPS & !is_DRIVE_CYCLOPS,
-#          new_type = ifelse(is_new, 'new', 'known'),
-#          CE_type = ifelse(targ_gene %in% hart_ess, 'CE', 'non-CE'))
-#
-# ggplot(cur_res, aes(D1_best, D2)) +
-#   geom_point(aes(shape = CE_type, color = new_type), size = 2, alpha = 0.7) +
-#   geom_abline() +
-#   geom_label_repel(data = cur_res %>%
-#                     filter(is_new) %>%
-#                     arrange(desc(D2_imp)) %>%
-#                     head(10),
-#                   aes(label = targ_symbol), color = 'red', size = 2., padding = 0.15) +
-#   guides(shape = guide_legend(title = element_blank()),
-#          color = guide_legend(title = element_blank())) +
-#   theme_Publication() +
-#   scale_colour_manual(values = c(new = 'red', known = 'black')) +
-#   xlab('Best D1\nCYCLOPS correlation') +
-#   ylab('D2-combined\nCYCLOPS correlation')
-#
-# export_fig('CYCLOPS_corr_compare', width = 3.5, height = 3.5)
-#
-# ##STATS
-# D1_cyclops <- rel_an %>%
-#   filter(dset %in% c('D1_Ach', 'D1_DRIVE'), MDP == 'Cyclops') %>%
-#   .[['targ_gene']] %>%
-#   unique()
-# D2c_cyclops <- rel_an %>%
-#   filter(dset %in% c('D2_comb'), MDP == 'Cyclops') %>%
-#   .[['targ_gene']] %>%
-#   unique()
-# known_cyclops <- cur_res %>%
-#   filter(is_Ach_CYCLOPS | is_DRIVE_CYCLOPS) %>%
-#   .[['targ_gene']]
-# print(sprintf('%d total CYCLOPS, %d unique to D2 combined, %d not known',
-#               nrow(all_cyclops), length(setdiff(D2c_cyclops, D1_cyclops)), length(setdiff(D2c_cyclops, known_cyclops))))
-#
-# ggplot(rel_an %>%
-#          filter(dset %in% c('D2_comb'),
-#                 targ_gene %in% union(D1_cyclops, D2c_cyclops)) %>%
-#           left_join(gene_avgs %>% filter(dset == 'D2_comb'),
-#             by = c('targ_gene' = 'Gene')),
-#        aes(avg_score, cor, color = targ_gene %in% D1_cyclops)) +
-#   geom_point()
-
-```
-
-<!-- ##5g -->
-
-```{r}
-rel_an %<>% mutate(target_partner = paste0(target, '_', partner),
-                   targ_part_ID = paste0(targ_gene, '_', feat_gene)) %>%
-            mutate(target_symbol = Gene_ID_to_symb[targ_gene],
-                   feature_symbol = Gene_ID_to_symb[feat_gene])
-
-cur_rel_an <- rel_an %>% 
-  filter(dset %in% c('D2_comb', 'D1_Ach', 'D1_DRIVE')) %>%
-  left_join(gene_avgs %>% filter(dset == 'D2_comb') %>% dplyr::select(-dset),
-            by = c('targ_gene' = 'Gene'))
-
-D2_unique_set <- setdiff(
-  cur_rel_an %>% filter(dset == 'D2_comb') %>% .[['targ_part_ID']],
-  cur_rel_an %>% filter(dset != 'D2_comb') %>% .[['targ_part_ID']]
-)
-D2_miss_set <- setdiff(
-  cur_rel_an %>% filter(dset != 'D2_comb') %>% .[['targ_part_ID']],
-  cur_rel_an %>% filter(dset == 'D2_comb') %>% .[['targ_part_ID']]
-)
-
-ggplot(cur_rel_an %>% filter(dset == 'D2_comb'), 
-       aes(avg_score, fill = targ_part_ID %in% D2_unique_set)) + 
-  geom_density(alpha = 0.5) +
-  guides(fill = F)
-
-ggplot(cur_rel_an %>% filter(dset == 'D2_comb', MDP == 'paralog loss'), 
-       aes(avg_score, cor, color = targ_part_ID %in% D2_unique_set)) + 
-  geom_point(alpha = 0.5) 
-```
-
-
-```{r}
-rel_an %<>% mutate(target_partner = paste0(target, '_', partner),
-                   targ_part_ID = paste0(targ_gene, '_', feat_gene)) %>%
-            mutate(target_symbol = Gene_ID_to_symb[targ_gene],
-                   feature_symbol = Gene_ID_to_symb[feat_gene])
-
-D2_unique <- rel_an %>%
-  filter(dset == 'D2_comb') %>%
-  distinct(targ_part_ID) %>%
-  .[['targ_part_ID']] %>%
-  setdiff(rel_an %>%
-            filter(dset %in% c('D1_Ach', 'D1_DRIVE')) %>%
-            distinct(targ_part_ID) %>%
-            .[['targ_part_ID']])
-
-D2_unique_rel_an <- rel_an %>%
-  filter(!is.na(MDP)) %>%
-  # filter(targ_part_ID %in% D2_unique, dset == 'D2_comb') %>%
-  mutate(is_unique = targ_part_ID %in% D2_unique) %>% 
-  filter(dset == 'D2_comb') %>%
-  left_join(gene_avgs %>% filter(dset == 'D2_comb') %>% dplyr::select(-dset),
-            by = c('targ_gene' = 'Gene'))
-
-D2_unique_rel_an %<>% mutate(MDP = factor(MDP, levels = MDP_plot_order))
-cur_cols <- hue_pal()(5) %>% set_names(MDP_plot_order)
-
-D2_unique_rel_an %<>% mutate(target_partner = str_replace_all(target_partner, '_', '/'),
-                             unique_status = ifelse(is_unique, 'D2-only', 'shared'))
-ggplot(D2_unique_rel_an %>% filter(MDP %in% c('CYCLOPS', 'paralog loss')), 
-         # filter(is_unique), 
-       aes(avg_score, abs(cor), fill = factor(unique_status))) +
-  # geom_point(alpha = 0.75) +
-    geom_point(alpha = 1, shape = 21, size = 2, stroke = 0.25, color = 'white') +
-  xlab('Cell line avg dependency') +
-  ylab('Feature-dep corr\nmagnitude (D2 comb)') +
-  theme_Publication() +
-  # scale_fill_manual(values = cur_cols) +
-  scale_size_manual(values = c(`FALSE` = 1.5, `TRUE` = 2.5)) +
-  guides(fill = guide_legend(title = element_blank(), nrow=1)) +
-  #        size = guide_legend(title = 'D2 unique', nrow = 2, override.aes = list(color = 'black',
-  #                                                                               fill = 'black'))) +
-  # geom_label_repel(data = D2_unique_rel_an %>%
-  #                    arrange(desc(abs(cor))) %>%
-  #                    head(10),
-  #                  aes(label = target_partner), size = 2,
-  #                  label.padding = 0.15, show.legend = F) +
-  facet_wrap(~MDP)
-export_fig('new_MDP_scatters', width = 5.5, height = 3.25)
-```
-
-```{r}
-use_zscore <- FALSE
-use_abs <- FALSE
-doMC::registerDoMC(cores = 5)
-
-rel_an %<>% mutate(target_partner = paste0(target, '_', partner),
-                   targ_part_ID = paste0(targ_gene, '_', feat_gene)) %>%
-            mutate(target_symbol = Gene_ID_to_symb[targ_gene],
-                   feature_symbol = Gene_ID_to_symb[feat_gene])
-
-all_pairs <- rel_an %>% filter(dset %in% c('D2_comb', 'D1_Ach', 'D2_DRIVE')) %>% 
-  distinct(targ_part_ID, .keep_all=T) %>% 
-  dplyr::select(targ_gene, feat_gene, feat_type) 
-
-all_df_res <- adply(all_pairs, 1, function(row) {
-  D1_Ach_cors <- get_spec_assoc('D1_Ach', row$targ_gene, row$feat_gene, row$feat_type, use_bayes = use_bayes)
-  D1_DRIVE_cors <- get_spec_assoc('D1_DRIVE', row$targ_gene, row$feat_gene, row$feat_type, use_bayes = use_bayes)
-  D2_comb_cors <- get_spec_assoc('D2_comb', row$targ_gene, row$feat_gene, row$feat_type, use_bayes = use_bayes)
-  return(data.frame(
-    targ_gene = row$targ_gene,
-    feat_gene = row$feat_gene,
-    D2 = D2_comb_cors,
-    D1_Ach = D1_Ach_cors,
-    D1_DRIVE = D1_DRIVE_cors
-  ))
-}, .parallel = T) %>%
-  mutate(targ_gene = as.character(targ_gene),
-         feat_gene = as.character(feat_gene),
-         D1_DRIVE_mag = abs(D1_DRIVE),
-         D1_Ach_mag = abs(D1_Ach),
-         D1_best_mag = pmax(D1_Ach_mag, D1_DRIVE_mag, na.rm=T),
-         D2_mag = abs(D2),
-         targ_symbol = Gene_ID_to_symb[targ_gene],
-         D2_imp = D2_mag - D1_best_mag,
-         CE_type = ifelse(targ_gene %in% hart_ess, 'CE', 'non-CE'))
-all_df_res %<>% left_join(gene_avgs %>% filter(dset == 'D2_comb') %>% dplyr::select(-dset), by = c('targ_gene' = 'Gene'))
-all_df_res %<>% mutate(targ_part_ID = paste0(targ_gene, '_', feat_gene),
-                       D2_unique = targ_part_ID %in% D2_unique
-)
-all_df_res %<>% left_join(rel_an %>% 
-                            filter(targ_part_ID %in% all_df_res$targ_part_ID) %>% 
-                            distinct(targ_part_ID, .keep_all=T) %>% 
-                            dplyr::select(targ_part_ID, MDP),
-                          by = 'targ_part_ID')
-```
-
-
-```{r}
-use_zscore <- TRUE
-use_abs <- FALSE
-doMC::registerDoMC(cores = 5)
-gdf <- related_genes %>%
-  filter(source == 'paralog', target_ID %in% all_dep_genes) %>%
-  dplyr::select(targ_gene = target_ID, feat_gene = partner_ID) %>%
-  sample_n(size = 10000)
-
-all_par_res <- adply(gdf, 1, function(row) {
-  D1_Ach_cors <- get_best_assoc('D1_Ach', row$targ_gene, row$feat_gene, z_score = use_zscore, use_abs = use_abs)
-  D1_DRIVE_cors <- get_best_assoc('D1_DRIVE', row$targ_gene, row$feat_gene, z_score = use_zscore, use_abs = use_abs)
-  D2_comb_cors <- get_best_assoc('D2_comb', row$targ_gene, row$feat_gene, z_score = use_zscore, use_abs = use_abs)
-  return(data.frame(
-    targ_gene = row$targ_gene,
-    feat_gene = row$feat_gene,
-    D2 = D2_comb_cors,
-    D1_Ach = D1_Ach_cors,
-    D1_DRIVE = D1_DRIVE_cors
-  ))
-}, .parallel = T) %>%
-  mutate(targ_gene = as.character(targ_gene),
-         feat_gene = as.character(feat_gene),
-         D1_best = pmax(D1_Ach, D1_DRIVE, na.rm=T),
-         targ_symbol = Gene_ID_to_symb[targ_gene],
-         D2_imp = abs(D2) - abs(D1_best),
-         CE_type = ifelse(targ_gene %in% hart_ess, 'CE', 'non-CE'))
-all_par_res %<>% left_join(gene_avgs %>% filter(dset == 'D2_comb'), by = c('targ_gene' = 'Gene'))
-all_par_res %<>% filter(!is.infinite(D2))
-
-```
-
+## 5f: Dose-dependency corr analysis
 
 ```{r}
 Tsherniak_supp <- read.csv('~/CPDS/data/Achilles/shRNA/Tsherniak_supp_table_MDP.csv', stringsAsFactors = F, check.names = F)
@@ -2303,6 +2062,7 @@ DRIVE_CYCLOPS <- read_lines('~/CPDS/data/Novartis/DRIVE_CYCLOPS.txt')
 use_zscore <- FALSE
 use_abs <- FALSE
 doMC::registerDoMC(cores = 5)
+#compute dose-dependency correlations across all genes 
 gdf <- data.frame(targ_gene = all_dep_genes,
                   feat_gene = all_dep_genes,
                   stringsAsFactors = F)
@@ -2328,37 +2088,20 @@ all_cyc_res <- adply(gdf, 1, function(row) {
          is_new = !is_Ach_CYCLOPS & !is_DRIVE_CYCLOPS,
          new_type = ifelse(is_new, 'new', 'known'),
          CE_type = ifelse(targ_gene %in% hart_ess, 'CE', 'non-CE'))
-# all_cyc_res %<>% mutate(gene_type = get_gene_type(targ_gene, hart_ess, hart_non_ess))
-all_cyc_res %<>% left_join(gene_avgs %>% filter(dset == 'D2_comb'), by = c('targ_gene' = 'Gene'))
-all_cyc_res %<>% filter(!is.infinite(D2))
 
-tval <- 0.3
-# ggplot(all_cyc_res, aes(D1_best, D2, color = avg_score )) + 
-#   geom_point(alpha = 0.5, size = 1) + 
-#   geom_abline() +
-#   geom_vline(xintercept = tval, linetype = 'dashed') + 
-#   geom_hline(yintercept = tval, linetype = 'dashed') +      
-#   geom_vline(xintercept = -tval, linetype = 'dashed') +
-#   geom_hline(yintercept = -tval, linetype = 'dashed') +
-# scale_color_gradient(limits = c(-1, 0), oob = scales::squish,
-#                      low = 'red', high = 'black') 
+all_cyc_res %<>% left_join(gene_avgs %>% filter(dset == 'D2_comb'), by = c('targ_gene' = 'Gene')) %>% filter(!is.infinite(D2))
 
-# plot_colorByDensity(all_cyc_res, 'D1_best', 'D2') +
+# tval <- 0.3
+
 all_cyc_res %<>% mutate(`Avg. dependency` = avg_score)
 g <- ggplot(all_cyc_res, aes(D1_best, D2)) +
     geom_point(aes(fill = `Avg. dependency`), alpha = 0.75, shape = 21, size = 1.5, stroke = 0.25, color = 'white') +
-  # geom_smooth(color = 'red') +
   geom_abline() +
-  # geom_vline(xintercept = tval, linetype = 'dashed') +
-  # geom_hline(yintercept = tval, linetype = 'dashed') +
-  # geom_vline(xintercept = -tval, linetype = 'dashed') +
-  # geom_hline(yintercept = -tval, linetype = 'dashed') +
   geom_vline(xintercept = 0) +
   geom_hline(yintercept = 0) +
   xlab('Gene dose-dependency\ncorr (D1 best)') +
   ylab('Gene dose-dependency\ncorr (D2 comb)') +
   scale_fill_gradient(low = 'red', high = 'black', limits = c(-1, 0), breaks = c(-1, 0), oob = scales::squish) +
-  # guides(fill = guide_legend(title = 'Avg dependency')) +
   theme_Publication()
 g1 <- g +   
   geom_label_repel(data = all_cyc_res %>%
@@ -2385,34 +2128,51 @@ with(all_cyc_res,
 with(all_cyc_res,
      table(D2 = D2 > tval, D1 = D1_best > tval))
 
-# all_cyc_res %<>% mutate(new = ifelse(is_Ach_CYCLOPS | is_DRIVE_CYCLOPS, 'known-CYCLOPS', 'other'))
-all_cyc_res %<>% mutate(targ_part_ID = paste0(targ_gene, '_', feat_gene),
-                        new = ifelse(targ_part_ID %in% D2_unique_set, 'known-CYCLOPS', 'other'))
-ggplot(all_cyc_res, aes(avg_score, D2)) +
-      geom_point(alpha = 0.6, shape = 21, size = 1.5, stroke = 0.25, color = 'white', 
-                 aes(fill = new)) +
-# geom_point(alpha = 0.5, size = 1.5, aes(color = is_Ach_CYCLOPS | is_DRIVE_CYCLOPS)) +
-  # geom_vline(xintercept = -0.5, linetype = 'dashed') +
-  geom_hline(yintercept = tval, linetype = 'dashed') +
-  # geom_vline(xintercept = -tval, linetype = 'dashed') +
-  # geom_hline(yintercept = -tval, linetype = 'dashed') +
-  geom_hline(yintercept = 0) +
-  geom_smooth(color = 'blue') +
-  guides(color = F) +
-  # geom_text_repel(data = all_cyc_res %>% 
-  #                   arrange(desc(D2)) %>% 
-  #                   head(20),
-  #                 aes(label = targ_symbol), size = 2.5) +
-  coord_cartesian(ylim = c(-0.25, 0.7), xlim = c(-1.6, 0.25)) +
-  scale_fill_manual(values = c(`known-CYCLOPS` = 'red', `other` = 'black')) +
-  xlab('Cell line avg dependency') +
-  ylab('Gene dose-dependency\ncorr (D2 comb)') +
-  theme_Publication() +
-  guides(fill = guide_legend(title = ''))
-    # scale_alpha_manual(values = c(`FALSE` = 0.25, `TRUE` = 1))
-export_fig('gene_dose_dep_ess_scatter', width = 3.5, height = 3.5)
-
 ```
+
+## 5g: MDP corr-CE scatter
+
+```{r}
+rel_an %<>% mutate(target_partner = paste0(target, '_', partner),
+                   targ_part_ID = paste0(targ_gene, '_', feat_gene)) %>%
+            mutate(target_symbol = Gene_ID_to_symb[targ_gene],
+                   feature_symbol = Gene_ID_to_symb[feat_gene])
+
+D2_unique <- rel_an %>%
+  filter(dset == 'D2_comb') %>%
+  distinct(targ_part_ID) %>%
+  .[['targ_part_ID']] %>%
+  setdiff(rel_an %>%
+            filter(dset %in% c('D1_Ach', 'D1_DRIVE')) %>%
+            distinct(targ_part_ID) %>%
+            .[['targ_part_ID']])
+
+D2_unique_rel_an <- rel_an %>%
+  filter(!is.na(MDP)) %>%
+  mutate(is_unique = targ_part_ID %in% D2_unique) %>% 
+  filter(dset == 'D2_comb') %>%
+  left_join(gene_avgs %>% filter(dset == 'D2_comb') %>% dplyr::select(-dset),
+            by = c('targ_gene' = 'Gene'))
+
+D2_unique_rel_an %<>% mutate(MDP = factor(MDP, levels = MDP_plot_order))
+cur_cols <- hue_pal()(5) %>% set_names(MDP_plot_order)
+
+D2_unique_rel_an %<>% mutate(target_partner = str_replace_all(target_partner, '_', '/'),
+                             unique_status = ifelse(is_unique, 'D2-only', 'shared'))
+ggplot(D2_unique_rel_an %>% filter(MDP %in% c('CYCLOPS', 'paralog loss')), 
+       aes(avg_score, abs(cor), fill = factor(unique_status))) +
+    geom_point(alpha = 1, shape = 21, size = 2, stroke = 0.25, color = 'white') +
+  xlab('Cell line avg dependency') +
+  ylab('Feature-dep corr\nmagnitude (D2 comb)') +
+  theme_Publication() +
+  scale_size_manual(values = c(`FALSE` = 1.5, `TRUE` = 2.5)) +
+  guides(fill = guide_legend(title = element_blank(), nrow=1)) +
+  facet_wrap(~MDP)
+export_fig('new_MDP_scatters', width = 5.5, height = 3.25)
+```
+
+
+
 
 
 
