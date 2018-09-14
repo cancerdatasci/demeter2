@@ -41,7 +41,7 @@ registerDoMC(cores = 3)
 
 source('~/CPDS/packages/demeter2_pub/scripts/benchmark_helpers.R')
 
-fig_dir <- '~/CPDS/demeter2/results/figures'
+fig_dir <- '~/CPDS/demeter2/results/final_figures'
 temp_file_suffix <- 'final'
 base_font <- 12 #font size for figs
 
@@ -161,7 +161,7 @@ CRISPR_benchmarks <- read.csv('~/CPDS/demeter2/results/top_CRISPR_biomarkers.csv
 
 ```{r}
 #make function for exporting figures
-export_fig <- function(fig_name, width, height, type = 'png', plot = NULL) {
+export_fig <- function(fig_name, width, height, type = 'pdf', plot = NULL) {
     if (is.null(plot)) {
         plot <- last_plot()
     }
@@ -2920,6 +2920,7 @@ dep_data$D1PC_DRIVE <- list(gene_scores = proj_D1_data,
                             type = 'rel')
 ```
 
+
 ## S5b: Compare PC1 with screen signal
 
 ```{r}
@@ -3030,7 +3031,7 @@ p1 <- ggplot(bench_res_test %>% filter(grepl('Ach', model)),
     scale_x_reverse() +
     xlab('Correlation magnitude |r|') +
     ylab('CDF') +
-    coord_cartesian(xlim = c(0.6, 0), ylim = c(0, 0.75)) +
+    coord_cartesian(xlim = c(0.6, 0), ylim = c(0, 1)) +
     # xlim(0.6, 0) +
     # ylim(0, 0.75) +
     guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3))) + 
@@ -3044,7 +3045,7 @@ p2 <- ggplot(bench_res_test %>% filter(grepl('DRIVE', model)),
     scale_x_reverse() +
     xlab('Correlation magnitude |r|') +
     ylab('CDF') +
-    coord_cartesian(xlim = c(0.75, 0), ylim = c(0, 0.75)) +
+    coord_cartesian(xlim = c(0.75, 0), ylim = c(0, 1)) +
     # xlim(0.6, 0) +
     # ylim(0, 0.75) +
     guides(color = guide_legend(title = element_blank(), nrow = 2, keyheight = 1.15, override.aes = list(size = 3))) + 
@@ -3065,7 +3066,9 @@ bench_res_test_spread <- spread(bench_res_test %>% dplyr::select(-p.value, -ptyp
 compare_bench_results <- function(bench_res_spread, type1, type2) {
   print(sprintf('Comparing bench results for %s vs %s', type1, type2))
   print(sprintf("Wilcox p: %.3g", wilcox.test(bench_res_spread[[type1]], bench_res_spread[[type2]], paired = TRUE)$p.value))
+  print(sprintf("T-test p: %.3g", t.test(bench_res_spread[[type1]], bench_res_spread[[type2]], paired = TRUE)$p.value))
   print(sprintf("Med diff p: %.4f", median(bench_res_spread[[type1]] - bench_res_spread[[type2]], na.rm=T)))
+  print(sprintf("Mean diff p: %.4f", mean(bench_res_spread[[type1]] - bench_res_spread[[type2]], na.rm=T)))
   print(sprintf("N shared p: %d", sum(!is.na(bench_res_spread[[type1]]) & !is.na(bench_res_spread[[type2]]))))
 }
 
