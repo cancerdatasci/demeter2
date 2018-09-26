@@ -87,6 +87,14 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_scores.csv')
 cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=11, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_gene_dep_score_SDs.csv')
 
+#seed means
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=13, data.file='seed_means_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_seed_dep_scores.csv')
+
+#seed SDs
+cur_data <- load.from.taiga(data.name='demeter2-achilles-5386', data.version=13, data.file='seed_SDs_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_Achilles_seed_dep_score_SDs.csv')
+
 
 
 #---------------------------------------------------------------------------------------------------------
@@ -108,6 +116,13 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_scores.csv')
 cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=10, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_gene_dep_score_SDs.csv')
 
+#seed means
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=12, data.file='seed_means_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_seed_dep_scores.csv')
+
+#seed SDs
+cur_data <- load.from.taiga(data.name='demeter2-drive-0591', data.version=12, data.file='seed_SDs_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_seed_dep_score_SDs.csv')
 
 
 #---------------------------------------------------------------------------------------------------------
@@ -129,13 +144,38 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_scores.csv')
 cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_score_SDs.csv')
 
+#seed means
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=13, data.file='seed_means_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_seed_dep_scores.csv')
+
+#seed SDs
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=13, data.file='seed_SDs_proc')
+write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_seed_dep_score_SDs.csv')
+
 
 #---------------------------------------------------------------------------------------------------------
 #WES_SNP_CN_data
 #---------------------------------------------------------------------------------------------------------
-cur_data <- load.from.taiga(data.name = 'depmap-wes-cn-data-97cc', data.version = 5, data.file = 'public_18q1_gene_cn', transpose = TRUE)
-D2_comb_CLs <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=6, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name = 'depmap-wes-cn-data-97cc', data.version=5, data.file = 'public_18q1_gene_cn', transpose = TRUE)
+D2_comb_CLs <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=11, data.file='CL_data_comb')
 cur_data <- cur_data[, rownames(D2_comb_CLs)[rownames(D2_comb_CLs) %in% colnames(cur_data)]]
 write.csv(cur_data, '~/CPDS/data/D2_figshare/WES_SNP_CN_data.csv')
 
+
+#---------------------------------------------------------------------------------------------------------
+#RNAseq data
+#---------------------------------------------------------------------------------------------------------
+cur_data <- load.from.taiga(data.name = 'ccle-rnaseq-logrpkm-protein-coding-2700', data.version = 1)
+D2_comb_CLs <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=11, data.file='CL_data_comb')
+cur_data <- cur_data[, rownames(D2_comb_CLs)[rownames(D2_comb_CLs) %in% colnames(cur_data)]]
+write.csv(cur_data, '~/CPDS/data/D2_figshare/RNAseq_lRPKM_data.csv')
+
+
+#---------------------------------------------------------------------------------------------------------
+#MAF file
+#---------------------------------------------------------------------------------------------------------
+D2_comb_CLs <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=11, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name = 'ccle-mutation-data-full-', data.version = 2) %>% 
+  filter(Tumor_Sample_Barcode %in% rownames(D2_comb_CLs))
+write.csv(cur_data, '~/CPDS/data/D2_figshare/CCLE_mutation_data.csv', row.names = F)
 

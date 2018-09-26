@@ -500,7 +500,7 @@ make_CL_vs_avg_plot <- function(dep_name, test_CLs, gene_avgs) {
         mutate(CL_name = str_match(CCLE_ID, '([:alnum:]+)_')[,2]) %>% 
         mutate(gene_type = plyr::revalue(gene_type, c(non_essential = 'non-essential')))
     ggplot(df, aes(avg_score, score)) +
-        geom_point(alpha = 0.75, size = 0.75, color = 'grey') +
+        geom_point(size = 0.5, color = 'grey') +
         geom_density_2d(data = filter(df, gene_type %in% c('essential', 'non-essential')),
                         aes(color = gene_type)) +
         geom_abline() +
