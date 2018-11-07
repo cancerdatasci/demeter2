@@ -45,7 +45,8 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/drive-poolb-lfc-mat.csv')
 #---------------------------------------------------------------------------------------------------------
 #Marcotte LFC data
 #---------------------------------------------------------------------------------------------------------
-cur_data <- load.from.taiga(data.name = 'marcotte-lfc-data-ccle-id-d459', data.version =2)
+# cur_data <- load.from.taiga(data.name = 'marcotte-lfc-data-ccle-id-d459', data.version =2)
+cur_data <- load.from.taiga(data.name = 'marcotte-demeter-z-scored-expanded-gene-sols-e905', data.version =15, data.file = 'log.effect.removed.bad')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/Marcotte_LFC_matrix.csv')
 
 
@@ -129,27 +130,27 @@ write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_DRIVE_seed_dep_score_SDs.csv')
 #D2 Combined model fit
 #---------------------------------------------------------------------------------------------------------
 #CL data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='CL_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='CL_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_CL_data.csv')
 
 #hp data
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='hp_data_comb')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='hp_data_comb')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_hp_data.csv')
 
 #gene means
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='gene_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='gene_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_scores.csv')
 
 #gene SDs
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=10, data.file='gene_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='gene_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_gene_dep_score_SDs.csv')
 
 #seed means
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=13, data.file='seed_means_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='seed_means_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_seed_dep_scores.csv')
 
 #seed SDs
-cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=13, data.file='seed_SDs_proc')
+cur_data <- load.from.taiga(data.name='demeter2-combined-dc9c', data.version=14, data.file='seed_SDs_proc')
 write.csv(cur_data, '~/CPDS/data/D2_figshare/D2_combined_seed_dep_score_SDs.csv')
 
 
